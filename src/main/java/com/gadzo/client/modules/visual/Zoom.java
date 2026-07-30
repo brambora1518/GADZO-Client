@@ -7,6 +7,8 @@ import com.gadzo.client.core.setting.NumberSetting;
 import com.gadzo.client.util.Animation;
 import com.gadzo.client.util.Easing;
 
+import org.lwjgl.glfw.GLFW;
+
 /**
  * Optifine-style zoom.
  *
@@ -33,6 +35,8 @@ public class Zoom extends Module {
         instance = this;
         // Zoom is driven by holding its keybind, so the module itself stays enabled.
         markPermanent();
+        // C is where every other client puts zoom, and vanilla leaves it free.
+        getKeybind().setValue(GLFW.GLFW_KEY_C);
 
         this.zoomFactor = addNumber("Zoom level", 4.0, 1.5, 12.0, 0.5,
                 "How far in the camera zooms");
