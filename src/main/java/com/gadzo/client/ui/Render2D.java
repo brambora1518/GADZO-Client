@@ -311,9 +311,22 @@ public final class Render2D {
      *
      * <p>This is the frosted-glass effect behind the menus: the world (and any panel already
      * submitted) is blurred, then the current stratum draws on top of it crisply.
+     *
+     * <p>The GUI render state permits only one blur per frame and throws on a second request.
+     * Screens are expected to call this from {@code extractBackground}, replacing vanilla's
+     * own blur rather than adding to it — but a backdrop effect must never be able to take
+     * the game down, so a duplicate request is swallowed and the frame simply renders
+     * unblurred.
+     *
+     * @return whether the blur was accepted
      */
-    public static void blurBehind(GuiGraphicsExtractor gfx) {
-        gfx.blurBeforeThisStratum();
+    public static boolean blurBehind(GuiGraphicsExtractor gfx) {
+        try {
+            gfx.blurBeforeThisStratum();
+            return true;
+        } catch (IllegalStateException alreadyBlurred) {
+            return false;
+        }
     }
 
     /** Starts a new depth stratum so later draws sit cleanly above earlier ones. */

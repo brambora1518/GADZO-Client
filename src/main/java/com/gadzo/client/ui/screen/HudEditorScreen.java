@@ -70,13 +70,22 @@ public class HudEditorScreen extends Screen {
 
     // -- rendering ---------------------------------------------------------------------------
 
+    /**
+     * Frosted backdrop.
+     *
+     * <p>See {@code ClickGuiScreen.extractBackground}: vanilla's default background requests
+     * a blur too, and only one is permitted per frame.
+     */
     @Override
-    public void extractRenderState(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
+    public void extractBackground(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
         if (Theme.blurEnabled()) {
             Render2D.blurBehind(gfx);
         }
         Render2D.rect(gfx, 0, 0, width, height, 0x99000000);
+    }
 
+    @Override
+    public void extractRenderState(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
         drawCenterLines(gfx);
 
         for (HudModule module : editableElements()) {

@@ -144,17 +144,29 @@ public class ClickGuiScreen extends Screen {
 
     // -- rendering --------------------------------------------------------------------------
 
+    /**
+     * Frosted backdrop.
+     *
+     * <p>Done here rather than in {@link #extractRenderState} because vanilla's default
+     * background also requests a blur, and the GUI render state allows only one per frame —
+     * overriding replaces that request instead of adding a second one that would throw.
+     */
     @Override
-    public void extractRenderState(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
-        windowX = (width - WINDOW_WIDTH) / 2.0;
-        windowY = (height - WINDOW_HEIGHT) / 2.0;
-
+    public void extractBackground(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
         double open = openAnimation.value();
         if (Theme.blurEnabled()) {
             Render2D.blurBehind(gfx);
         }
         // Dim the world so the window reads as a focused surface.
         Render2D.rect(gfx, 0, 0, width, height, ColorUtil.fade(0xB0000000, open));
+    }
+
+    @Override
+    public void extractRenderState(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
+        windowX = (width - WINDOW_WIDTH) / 2.0;
+        windowY = (height - WINDOW_HEIGHT) / 2.0;
+
+        double open = openAnimation.value();
 
         // Slide the window up slightly as it fades in.
         double slide = (1.0 - open) * 18.0;
