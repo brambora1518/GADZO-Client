@@ -8,7 +8,9 @@
 		"GameModeMixin",
 		"KeyboardHandlerMixin",
 		"MouseHandlerMixin",
-		"ParticleEngineMixin"
+		"ParticleEngineMixin",
+		"SkyRendererMixin",
+		"WeatherEffectRendererMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

@@ -1,5 +1,6 @@
 package com.gadzo.client;
 
+import com.gadzo.client.core.command.GadzoCommands;
 import com.gadzo.client.core.config.ConfigManager;
 import com.gadzo.client.core.hud.HudManager;
 import com.gadzo.client.core.module.ModuleManager;
@@ -14,20 +15,28 @@ import com.gadzo.client.modules.hud.ComboHud;
 import com.gadzo.client.modules.hud.CoordinatesHud;
 import com.gadzo.client.modules.hud.CpsHud;
 import com.gadzo.client.modules.hud.FpsHud;
+import com.gadzo.client.modules.hud.FrametimeGraphHud;
 import com.gadzo.client.modules.hud.HardwareHud;
 import com.gadzo.client.modules.hud.KeystrokesHud;
 import com.gadzo.client.modules.hud.MemoryHud;
 import com.gadzo.client.modules.hud.PingHud;
+import com.gadzo.client.modules.hud.PlayerStatsHud;
 import com.gadzo.client.modules.hud.PotionHud;
+import com.gadzo.client.modules.hud.SessionHud;
+import com.gadzo.client.modules.hud.SpeedHud;
+import com.gadzo.client.modules.hud.TargetHud;
 import com.gadzo.client.modules.hud.ToggleSprintHud;
+import com.gadzo.client.modules.hud.WorldInfoHud;
 import com.gadzo.client.modules.performance.DynamicFps;
 import com.gadzo.client.modules.performance.EntityCulling;
 import com.gadzo.client.modules.performance.ParticleLimiter;
 import com.gadzo.client.modules.performance.RenderTuning;
 import com.gadzo.client.modules.performance.ScreenEffects;
+import com.gadzo.client.modules.performance.WeatherRender;
 import com.gadzo.client.modules.visual.Fullbright;
 import com.gadzo.client.modules.visual.Zoom;
 import com.gadzo.client.ui.notify.Notifications;
+import com.gadzo.client.ui.screen.TitleScreenBranding;
 
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
@@ -76,6 +85,8 @@ public class GadzoClient implements ClientModInitializer {
         MODULES.activatePermanentModules();
         HudManager.register();
         Notifications.register();
+        GadzoCommands.register();
+        TitleScreenBranding.register();
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> MODULES.tick());
 
@@ -113,6 +124,8 @@ public class GadzoClient implements ClientModInitializer {
                 new EntityCulling(),
                 new ParticleLimiter(),
                 new ScreenEffects(),
+                new WeatherRender(),
+                new FrametimeGraphHud(),
 
                 // HUD
                 new FpsHud(),
@@ -126,15 +139,20 @@ public class GadzoClient implements ClientModInitializer {
                 new PotionHud(),
                 new ToggleSprintHud(),
                 new HardwareHud(),
+                new SpeedHud(),
+                new WorldInfoHud(),
+                new PlayerStatsHud(),
 
                 // Combat
                 new ComboHud(),
+                new TargetHud(),
 
                 // Visual
                 new Fullbright(),
                 new Zoom(),
 
                 // Client
+                new SessionHud(),
                 new MenuLauncher(),
                 new HudEditorLauncher(),
                 new ClientSettings());

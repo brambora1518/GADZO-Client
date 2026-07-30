@@ -422,9 +422,9 @@ public class ClickGuiScreen extends Screen {
         if (handleSettingsClick(mouseX, mouseY, event.button())) {
             return true;
         }
-        // A click outside an open dropdown closes it rather than falling through.
-        if (SettingRenderer.openDropdown() != null) {
-            SettingRenderer.closeDropdown();
+        // A click outside an open popup closes it rather than falling through.
+        if (SettingRenderer.openDropdown() != null || SettingRenderer.openPicker() != null) {
+            SettingRenderer.closePopups();
             return true;
         }
         if (handleSidebarClick(mouseX, mouseY)) {
@@ -501,7 +501,8 @@ public class ClickGuiScreen extends Screen {
     @Override
     public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
         if (SettingRenderer.isDragging()) {
-            SettingRenderer.mouseDragged(settingsX() + PADDING, settingsWidth() - PADDING * 2, event.x());
+            SettingRenderer.mouseDragged(settingsX() + PADDING, settingsWidth() - PADDING * 2,
+                    event.x(), event.y());
             return true;
         }
         return super.mouseDragged(event, deltaX, deltaY);
@@ -569,7 +570,7 @@ public class ClickGuiScreen extends Screen {
 
     @Override
     public void onClose() {
-        SettingRenderer.closeDropdown();
+        SettingRenderer.closePopups();
         SettingRenderer.releaseDrag();
         ConfigManager.save();
         super.onClose();

@@ -8,6 +8,7 @@ import com.gadzo.client.core.setting.NumberSetting;
 import com.gadzo.client.core.setting.Setting;
 import com.gadzo.client.ui.Render2D;
 import com.gadzo.client.ui.Theme;
+import com.gadzo.client.ui.widget.ColorPicker;
 import com.gadzo.client.util.Animation;
 import com.gadzo.client.util.ColorUtil;
 import com.gadzo.client.util.MathUtil;
@@ -42,6 +43,18 @@ public final class SettingRenderer {
     /** The dropdown currently expanded, if any. */
     private static EnumSetting<?> openDropdown;
 
+    /** The colour picker currently expanded, if any. */
+    private static ColorPicker openPicker;
+
+    /**
+     * Where the open picker was last drawn.
+     *
+     * <p>Recorded by the render pass so input handlers do not have to re-derive the row
+     * position; a click or drag can only follow a frame that already placed it.
+     */
+    private static double pickerX;
+    private static double pickerY;
+
     private SettingRenderer() {
     }
 
@@ -63,12 +76,28 @@ public final class SettingRenderer {
 
     public static void releaseDrag() {
         draggingSlider = null;
+        if (openPicker != null) {
+            openPicker.mouseReleased();
+        }
+    }
+
+    public static void closePicker() {
+        openPicker = null;
+    }
+
+    /** Closes every expanded popup; used when the screen changes context. */
+    public static void closePopups() {
+        openDropdown = null;
+        openPicker = null;
     }
 
     /** Extra height a row needs beyond {@link #ROW_HEIGHT}, e.g. for an expanded dropdown. */
     public static double extraHeight(Setting<?> setting, Font font) {
         if (setting instanceof EnumSetting<?> enumSetting && openDropdown == enumSetting) {
             return enumSetting.constants().length * (font.lineHeight + 5) + 4;
+        }
+        if (setting instanceof ColorSetting && openPicker != null && openPicker.setting() == setting) {
+            return openPicker.height() + 4;
         }
         return 0;
     }
@@ -101,6 +130,11 @@ public final class SettingRenderer {
             renderDropdown(gfx, font, enumSetting, right, y, mouseX, mouseY);
         } else if (setting instanceof ColorSetting colorSetting) {
             renderSwatch(gfx, colorSetting, right - SWATCH_SIZE, y + (ROW_HEIGHT - SWATCH_SIZE) / 2.0);
+            if (openPicker != null && openPicker.setting() == colorSetting) {
+                pickerX = right - ColorPicker.WIDTH;
+                pickerY = y + ROW_HEIGHT;
+                openPicker.render(gfx, font, pickerX, pickerY);
+            }
         } else if (setting instanceof KeybindSetting keybindSetting) {
             renderKeybind(gfx, font, keybindSetting, right, y);
         }
@@ -222,6 +256,12 @@ public final class SettingRenderer {
             }
         }
 
+        // Likewise an open colour picker, which extends well below its row.
+        if (openPicker != null && openPicker.setting() == setting
+                && openPicker.mouseClicked(pickerX, pickerY, mouseX, mouseY)) {
+            return true;
+        }
+
         boolean onRow = MathUtil.within(mouseX, mouseY, x, y, right, y + ROW_HEIGHT);
         if (!onRow) {
             return false;
@@ -245,15 +285,10 @@ public final class SettingRenderer {
             return true;
         }
         if (setting instanceof ColorSetting colorSetting) {
-            // Right-click cycles alpha presets; left-click steps the hue. A full picker would
-            // need its own popup surface, which the settings column has no room for.
-            if (button == 1 && colorSetting.allowsAlpha()) {
-                int alpha = ColorUtil.alpha(colorSetting.get());
-                colorSetting.setValue(ColorUtil.withAlpha(colorSetting.get(), alpha >= 255 ? 128 : 255));
+            if (openPicker != null && openPicker.setting() == colorSetting) {
+                openPicker = null;
             } else {
-                colorSetting.setValue(ColorUtil.hsb(
-                        (float) ((System.currentTimeMillis() % 3600) / 3600.0), 0.7f, 1.0f,
-                        ColorUtil.alpha(colorSetting.get())));
+                openPicker = new ColorPicker(colorSetting);
             }
             return true;
         }
@@ -284,15 +319,24 @@ public final class SettingRenderer {
         setting.setValue((E) constant);
     }
 
-    /** Continues a slider drag; call from the screen's drag handler. */
-    public static void mouseDragged(double rowX, double width, double mouseX) {
+    /** Continues a drag; call from the screen's drag handler. */
+    public static void mouseDragged(double rowX, double width, double mouseX, double mouseY) {
         if (draggingSlider != null) {
             draggingSlider.setFromFraction((mouseX - rowX) / width);
+            return;
+        }
+        if (openPicker != null && openPicker.isDragging()) {
+            openPicker.mouseDragged(pickerX, pickerY, mouseX, mouseY);
         }
     }
 
     public static boolean isDragging() {
-        return draggingSlider != null;
+        return draggingSlider != null || (openPicker != null && openPicker.isDragging());
+    }
+
+    /** The picker currently open, or {@code null}. */
+    public static ColorPicker openPicker() {
+        return openPicker;
     }
 
     /** Routes a key press to a listening keybind row. */

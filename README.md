@@ -20,6 +20,7 @@ unfair advantage: every module is a readout, a render setting, or a UI convenien
 | **Entity culling** | Stops drawing entities past a configurable distance, with separate limits for dropped items, item frames and armour stands. Players are never culled. |
 | **Particle limiter** | Budgets particle spawns per tick, so one explosion can't spike the frame time. |
 | **Screen effects** | Scales down nausea, portal warp, darkness pulse and glint animation — a performance win and a motion-comfort control. |
+| **Weather render** | Skips drawing rain, snow and optionally the sun/moon/stars. Precipitation is a large pile of camera-facing quads every frame and is one of the few effects that reliably halves the frame rate on older hardware during a storm. The weather itself is unaffected — sky still darkens, mobs still spawn. |
 
 Render tuning ships an **Auto-detect** preset that measures the machine rather than looking up
 a GPU model name in a table that would be wrong for anything it hadn't seen.
@@ -72,7 +73,32 @@ heap also squeezes the OS page cache, which is what makes chunk loading feel slu
 ### HUD
 
 FPS · CPS · Ping · Coordinates · Memory · Clock · Keystrokes · Armour · Potions · Movement
-state · Combo counter
+state · Speed · World info (biome / day / server) · Player stats · Hardware · Session ·
+Frametime graph · Combo counter · Target
+
+Two worth calling out:
+
+**Frametime graph.** An average FPS number hides the thing that actually ruins gameplay — the
+occasional 80 ms frame. Plotting frame *time* makes a stutter a tall bar rather than a dip in
+an already-averaged number, and the 1% low figure says the same thing numerically.
+
+**Target.** Health, absorption and distance for whoever you are fighting. The target is held
+for a configurable grace period after it leaves the crosshair, because in a fight the camera
+rarely stays on the opponent and a panel that vanished instantly would just flicker.
+
+### Commands
+
+Client-side, so they work on any server including vanilla ones — nothing is sent over the
+network.
+
+```
+/gadzo list [category]        list modules and their state
+/gadzo toggle <module>        toggle by loose name match ("ent" finds "Entity culling")
+/gadzo profile                show profiles
+/gadzo profile save|load <n>  manage profiles
+/gadzo hardware               tier, benchmark score, bottleneck, heap advice
+/gadzo save                   write the active profile
+```
 
 Every element supports anchoring, pixel offsets, scaling, a background plate, an optional
 border and a text-shadow toggle — and each has its own settings on top of that (the FPS
@@ -111,7 +137,18 @@ world stays visible behind a frosted-glass blur, so you can tune a HUD element a
 change.
 
 Themes: Dark, Midnight and Light, with a static / gradient / rainbow accent, adjustable corner
-radius and an optional blur toggle.
+radius and an optional blur toggle. Colour settings open a real HSV picker — a
+saturation/value field with hue and alpha sliders, the alpha track drawn over a checkerboard
+so transparency is legible.
+
+The picker keeps HSV as its editing state rather than re-deriving it from the packed colour
+each frame: round-tripping through RGB loses hue whenever saturation or value hits zero, which
+would make the hue slider jump around while dragging in the black and white corners.
+
+The title screen carries a small GADZO panel. It is drawn as an overlay through Fabric's
+screen events rather than by replacing `TitleScreen` — substituting the whole screen would
+mean re-implementing world loading, realms and the accessibility onboarding for a purely
+cosmetic gain, and would be a new way to break the path into a world every version.
 
 ---
 
