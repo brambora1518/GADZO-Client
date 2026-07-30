@@ -67,15 +67,17 @@ public class GadzoClient implements ClientModInitializer {
     public void onInitializeClient() {
         LOGGER.info("{} v{} initialising", NAME, VERSION);
 
+        // Kicked off first so it has the whole of startup to finish; the Auto preset falls
+        // back to Medium while it is still running.
+        CpuBenchmark.startAsync();
+
         registerModules();
+        // Only safe once every constructor has finished — see Module.markPermanent().
+        MODULES.activatePermanentModules();
         HudManager.register();
         Notifications.register();
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> MODULES.tick());
-
-        // Measure single-thread CPU speed off-thread; the Auto preset and the tier readout
-        // both wait on it rather than guessing from core count.
-        CpuBenchmark.startAsync();
 
         // Options are not ready during mod init, so the saved profile is applied once the
         // game has finished starting.

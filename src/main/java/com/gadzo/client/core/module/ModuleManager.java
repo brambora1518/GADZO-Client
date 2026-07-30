@@ -38,6 +38,24 @@ public class ModuleManager {
         }
     }
 
+    /**
+     * Enables every permanent module.
+     *
+     * <p>Must run after all modules are constructed. {@code markPermanent()} cannot enable
+     * them itself: subclasses call it from their constructor, so {@code onEnable()} would run
+     * against fields that have not been assigned yet.
+     */
+    public void activatePermanentModules() {
+        for (Module module : ordered) {
+            try {
+                module.activate();
+            } catch (Exception e) {
+                GadzoClient.LOGGER.error("Permanent module '{}' failed to activate",
+                        module.getId(), e);
+            }
+        }
+    }
+
     public List<Module> all() {
         return Collections.unmodifiableList(ordered);
     }

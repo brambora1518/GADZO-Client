@@ -117,18 +117,33 @@ public abstract class Module {
     /**
      * Marks this module as always-on.
      *
-     * <p>Permanent modules are enabled immediately: they are client plumbing (the menu
-     * launcher, the render-option bridge) rather than optional features, and leaving one
-     * switched off would strand the player — the mods menu cannot be reopened if the module
-     * that opens it is off.
+     * <p>Permanent modules are client plumbing — the menu launcher, the render-option bridge
+     * — rather than optional features; leaving one switched off would strand the player,
+     * since the mods menu cannot be reopened if the module that opens it is off.
+     *
+     * <p>This only records the flag. It deliberately does <em>not</em> enable the module or
+     * call {@link #onEnable()}, because subclasses call it from their constructor, before
+     * their own fields are assigned — running subclass code at that point sees a
+     * half-constructed object. {@link #activate()} does the enabling once construction has
+     * finished.
      */
     protected void markPermanent() {
         this.permanent = true;
-        if (!enabled) {
-            enabled = true;
-            toggleAnimation.snapTo(1.0);
-            onEnable();
+    }
+
+    /**
+     * Switches a permanent module on after construction is complete.
+     *
+     * <p>Called by the manager once every module has been built, which is the earliest point
+     * at which {@link #onEnable()} can safely touch subclass state.
+     */
+    void activate() {
+        if (!permanent || enabled) {
+            return;
         }
+        enabled = true;
+        toggleAnimation.snapTo(1.0);
+        onEnable();
     }
 
     protected void markHidden() {
