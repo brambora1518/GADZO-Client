@@ -1,0 +1,33 @@
+{
+	"schemaVersion": 1,
+	"id": "gadzo",
+	"version": "${version}",
+	"name": "GADZO Client",
+	"description": "A modern, high-performance custom Minecraft client: professional UI, draggable HUD editor, and the optimisation toggles you expect from Lunar or Badlion.",
+	"authors": [
+		"brambora1518"
+	],
+	"contact": {
+		"sources": "https://github.com/brambora1518/GADZO-Client",
+		"issues": "https://github.com/brambora1518/GADZO-Client/issues"
+	},
+	"license": "MIT",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"com.gadzo.client.GadzoClient"
+		]
+	},
+	"mixins": [
+		{
+			"config": "gadzo.mixins.json",
+			"environment": "client"
+		}
+	],
+	"depends": {
+		"fabricloader": ">=${loader_version}",
+		"minecraft": "~${minecraft_version}",
+		"java": ">=25",
+		"fabric-api": "*"
+	}
+}

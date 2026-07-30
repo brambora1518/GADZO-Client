@@ -1,0 +1,19 @@
+{
+	"required": true,
+	"package": "com.gadzo.client.mixin",
+	"compatibilityLevel": "JAVA_25",
+	"client": [
+		"CameraMixin",
+		"EntityRenderDispatcherMixin",
+		"GameModeMixin",
+		"KeyboardHandlerMixin",
+		"MouseHandlerMixin",
+		"ParticleEngineMixin"
+	],
+	"injectors": {
+		"defaultRequire": 1
+	},
+	"overwrites": {
+		"requireAnnotations": true
+	}
+}
