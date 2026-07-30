@@ -3,6 +3,8 @@ package com.gadzo.client;
 import com.gadzo.client.core.config.ConfigManager;
 import com.gadzo.client.core.hud.HudManager;
 import com.gadzo.client.core.module.ModuleManager;
+import com.gadzo.client.core.system.CpuBenchmark;
+import com.gadzo.client.core.system.SystemProfile;
 import com.gadzo.client.modules.client.ClientSettings;
 import com.gadzo.client.modules.client.HudEditorLauncher;
 import com.gadzo.client.modules.client.MenuLauncher;
@@ -71,6 +73,10 @@ public class GadzoClient implements ClientModInitializer {
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> MODULES.tick());
 
+        // Measure single-thread CPU speed off-thread; the Auto preset and the tier readout
+        // both wait on it rather than guessing from core count.
+        CpuBenchmark.startAsync();
+
         // Options are not ready during mod init, so the saved profile is applied once the
         // game has finished starting.
         ClientLifecycleEvents.CLIENT_STARTED.register(client -> {
@@ -84,6 +90,12 @@ public class GadzoClient implements ClientModInitializer {
                 renderTuning.apply();
             }
             LOGGER.info("{} ready — {} modules registered", NAME, MODULES.all().size());
+
+            String advice = SystemProfile.heapAdvice();
+            if (advice != null) {
+                LOGGER.info("Heap advisory: {}", advice);
+                Notifications.warning("Memory", advice);
+            }
         });
 
         ClientLifecycleEvents.CLIENT_STOPPING.register(client -> ConfigManager.save());

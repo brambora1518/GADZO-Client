@@ -166,46 +166,95 @@ public final class SystemProfile {
             return Tier.MEDIUM;
         }
 
+        if (!CpuBenchmark.isReady()) {
+            // Without the CPU measurement any verdict would be dominated by GPU signals,
+            // which is precisely the mistake this method exists to avoid. Wait for it.
+            return Tier.MEDIUM;
+        }
+
         int score = 0;
 
-        if (isDiscreteGpu()) {
+        // Single-thread CPU speed carries the most weight, because it is what actually gates
+        // Minecraft's frame rate. A fast GPU behind a slow core is still a slow client.
+        int cpu = CpuBenchmark.score();
+        int reference = CpuBenchmark.REFERENCE_SCORE;
+        if (cpu >= reference * 1.15) {
+            score += 4;
+        } else if (cpu >= reference * 0.85) {
+            score += 3;
+        } else if (cpu >= reference * 0.60) {
             score += 2;
+        } else if (cpu >= reference * 0.40) {
+            score += 1;
         }
 
+        // More threads help chunk meshing, but only secondarily.
         int threads = cpuThreads();
-        if (threads >= 16) {
-            score += 2;
-        } else if (threads >= 8) {
+        if (threads >= 12) {
             score += 1;
-        } else if (threads <= 4) {
+        } else if (threads <= 3) {
             score -= 1;
         }
 
-        long heap = maxHeapMb();
-        if (heap >= 6000) {
-            score += 2;
-        } else if (heap >= 3000) {
-            score += 1;
-        } else if (heap < 2000) {
-            score -= 1;
-        }
-
-        int vram = vramHintGb();
-        if (vram >= 8) {
-            score += 2;
-        } else if (vram >= 6) {
+        if (isDiscreteGpu()) {
             score += 1;
         }
-
+        if (vramHintGb() >= 6) {
+            score += 1;
+        }
         if (maxTextureSize() >= 16384) {
             score += 1;
         }
 
+        // Heap size is deliberately absent. It is a launcher setting the player chose, not a
+        // property of the machine, and a large one is as often a misconfiguration as a sign
+        // of a capable system — see heapAdvice().
+
         cachedTier = score >= 7 ? Tier.ULTRA
                 : score >= 5 ? Tier.HIGH
-                : score >= 2 ? Tier.MEDIUM
+                : score >= 3 ? Tier.MEDIUM
                 : Tier.LOW;
         return cachedTier;
+    }
+
+    /** Total physical RAM in megabytes, or -1 when the platform will not report it. */
+    public static long physicalRamMb() {
+        try {
+            java.lang.management.OperatingSystemMXBean bean =
+                    java.lang.management.ManagementFactory.getOperatingSystemMXBean();
+            if (bean instanceof com.sun.management.OperatingSystemMXBean sunBean) {
+                return sunBean.getTotalMemorySize() / (1024L * 1024L);
+            }
+        } catch (Throwable ignored) {
+            // Not available on this JVM; the advisory simply skips the ratio check.
+        }
+        return -1;
+    }
+
+    /**
+     * Advice about the heap allocation, or {@code null} when it looks sensible.
+     *
+     * <p>Over-allocating is the most common self-inflicted Minecraft performance problem.
+     * Vanilla with a normal render distance works comfortably in 2–4 GB; past that the
+     * garbage collector simply has a larger young generation to sweep, so collections happen
+     * less often but each one takes longer — which is felt as periodic stutter rather than a
+     * lower average frame rate. A very large heap also squeezes the OS page cache, which is
+     * what makes chunk loading feel slow.
+     */
+    public static String heapAdvice() {
+        long heap = maxHeapMb();
+        long physical = physicalRamMb();
+
+        if (physical > 0 && heap > physical * 0.55) {
+            return "Heap is " + heap + " MB of " + physical + " MB system RAM — leave more for the OS";
+        }
+        if (heap >= 6000) {
+            return "Heap is " + heap + " MB; 3–4 GB usually stutters less (longer GC pauses above that)";
+        }
+        if (heap < 1500) {
+            return "Heap is only " + heap + " MB — raise it to about 3 GB";
+        }
+        return null;
     }
 
     /**

@@ -21,10 +21,18 @@ unfair advantage: every module is a readout, a render setting, or a UI convenien
 | **Particle limiter** | Budgets particle spawns per tick, so one explosion can't spike the frame time. |
 | **Screen effects** | Scales down nausea, portal warp, darkness pulse and glint animation — a performance win and a motion-comfort control. |
 
-Render tuning ships an **Auto-detect** preset that reads the actual machine — discrete vs
-integrated GPU, thread count, heap size, maximum texture size — and picks a starting point
-from that rather than from a model-name lookup table that would be wrong for anything it
-hadn't seen.
+Render tuning ships an **Auto-detect** preset that measures the machine rather than looking up
+a GPU model name in a table that would be wrong for anything it hadn't seen.
+
+The dominant input is a short **single-thread CPU benchmark** run once at startup on a
+background thread. Core count is close to useless on its own here: Minecraft's render and tick
+loops are dominated by one thread, so an eight-thread CPU from 2012 and an eight-thread CPU
+from today behave nothing alike, and ranking them the same produces a render distance that
+tanks the older machine. GPU class, VRAM and maximum texture size contribute, but secondarily.
+
+**Heap size is deliberately not part of the score.** It is a launcher setting the player chose,
+not a property of the hardware, and a large value is as often a misconfiguration as a sign of a
+capable system.
 
 ### Knowing where your frames go
 
@@ -49,6 +57,17 @@ Two consequences baked into the defaults:
 GPU load is off by default. The game only measures it while its own `GPU_UTILIZATION` debug
 entry is active, so reading the figure means switching that entry on; the module does so only
 when you ask, and restores your previous setting when you turn it back off.
+
+### Heap advisory
+
+On startup the client checks the heap allocation and warns if it looks wrong — too large
+relative to system RAM, over ~6 GB, or under ~1.5 GB.
+
+Over-allocating is the most common self-inflicted Minecraft performance problem. Vanilla at a
+normal render distance is comfortable in 2–4 GB. Past that the garbage collector is not doing
+less work, it is doing it in bigger batches: collections become rarer but each one takes
+longer, which is felt as periodic stutter rather than a lower average frame rate. A very large
+heap also squeezes the OS page cache, which is what makes chunk loading feel sluggish.
 
 ### HUD
 
