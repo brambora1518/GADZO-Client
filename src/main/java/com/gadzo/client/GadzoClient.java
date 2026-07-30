@@ -7,6 +7,7 @@ import com.gadzo.client.core.module.ModuleManager;
 import com.gadzo.client.core.system.CpuBenchmark;
 import com.gadzo.client.core.system.SystemProfile;
 import com.gadzo.client.modules.client.ClientSettings;
+import com.gadzo.client.modules.client.CreateHelperLauncher;
 import com.gadzo.client.modules.client.HudEditorLauncher;
 import com.gadzo.client.modules.client.MenuLauncher;
 import com.gadzo.client.modules.hud.ArmorHud;
@@ -155,6 +156,7 @@ public class GadzoClient implements ClientModInitializer {
                 new SessionHud(),
                 new MenuLauncher(),
                 new HudEditorLauncher(),
+                new CreateHelperLauncher(),
                 new ClientSettings());
     }
 

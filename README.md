@@ -86,6 +86,28 @@ an already-averaged number, and the 1% low figure says the same thing numericall
 for a configurable grace period after it leaves the crosshair, because in a fight the camera
 rarely stays on the opponent and a panel that vanished instantly would just flicker.
 
+### Create helper
+
+Press **G**. A reference and stress planner for the [Create](https://modrinth.com/mod/create)
+mod.
+
+**Create has no build for Minecraft 26.2** — the Forge/NeoForge project stops at 1.21.1 and the
+Fabric port at 1.20.1 — so this cannot read a live kinetic network. It is a planning tool, and
+the stress calculator is the part that earns its keep: pick your machines, and it tells you the
+per-RPM load and how many water wheels, windmills or steam engines cover it. That is otherwise
+a spreadsheet job.
+
+The reference is weighted towards things that do not change between Create versions: how stress
+arithmetic works, gear ratios, belt rules, and the order to diagnose a stopped contraption in.
+Numeric impact values drift between releases, so they are marked as 0.5.x figures and every
+entry that leans on them points at the Engineer's Goggles, which are always authoritative for
+the build in front of you.
+
+The single most valuable thing in it is also the simplest: **speed does not buy stress
+headroom.** Impact and capacity are both per-RPM, so running a network faster raises
+consumption and capacity by exactly the same factor. If you are overstressed, you need more
+generators or fewer machines — gearing up changes nothing.
+
 ### Commands
 
 Client-side, so they work on any server including vanilla ones — nothing is sent over the
