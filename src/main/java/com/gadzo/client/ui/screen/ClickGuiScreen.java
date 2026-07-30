@@ -5,6 +5,7 @@ import com.gadzo.client.core.config.ConfigManager;
 import com.gadzo.client.core.module.Module;
 import com.gadzo.client.core.module.ModuleCategory;
 import com.gadzo.client.core.setting.Setting;
+import com.gadzo.client.core.system.SystemProfile;
 import com.gadzo.client.ui.Render2D;
 import com.gadzo.client.ui.Theme;
 import com.gadzo.client.util.Animation;
@@ -369,10 +370,15 @@ public class ClickGuiScreen extends Screen {
         double y = windowY + WINDOW_HEIGHT - FOOTER_HEIGHT;
         Render2D.separator(gfx, contentX(), y, contentWidth(), ColorUtil.fade(Theme.border(), alpha));
 
-        String left = GadzoClient.modules().enabledCount() + " enabled  ·  profile: "
-                + ConfigManager.activeProfile();
-        Render2D.text(gfx, font, left, contentX() + PADDING, y + 9,
-                ColorUtil.fade(Theme.textMuted(), alpha));
+        // Under Performance, show what the machine is doing rather than the profile name —
+        // that is the context a player needs while changing these settings.
+        String left = selectedCategory == ModuleCategory.PERFORMANCE && searchQuery.isBlank()
+                ? SystemProfile.detectTier() + " tier  ·  " + SystemProfile.bottleneck().label()
+                : GadzoClient.modules().enabledCount() + " enabled  ·  profile: "
+                        + ConfigManager.activeProfile();
+
+        Render2D.text(gfx, font, Render2D.truncate(font, left, (int) (contentWidth() - 90)),
+                contentX() + PADDING, y + 9, ColorUtil.fade(Theme.textMuted(), alpha));
         Render2D.textRight(gfx, font, "v" + GadzoClient.VERSION,
                 windowX + WINDOW_WIDTH - PADDING, y + 9,
                 ColorUtil.fade(Theme.textMuted(), alpha), false);

@@ -12,6 +12,7 @@ import com.gadzo.client.modules.hud.ComboHud;
 import com.gadzo.client.modules.hud.CoordinatesHud;
 import com.gadzo.client.modules.hud.CpsHud;
 import com.gadzo.client.modules.hud.FpsHud;
+import com.gadzo.client.modules.hud.HardwareHud;
 import com.gadzo.client.modules.hud.KeystrokesHud;
 import com.gadzo.client.modules.hud.MemoryHud;
 import com.gadzo.client.modules.hud.PingHud;
@@ -110,6 +111,7 @@ public class GadzoClient implements ClientModInitializer {
                 new ArmorHud(),
                 new PotionHud(),
                 new ToggleSprintHud(),
+                new HardwareHud(),
 
                 // Combat
                 new ComboHud(),

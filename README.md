@@ -21,6 +21,35 @@ unfair advantage: every module is a readout, a render setting, or a UI convenien
 | **Particle limiter** | Budgets particle spawns per tick, so one explosion can't spike the frame time. |
 | **Screen effects** | Scales down nausea, portal warp, darkness pulse and glint animation — a performance win and a motion-comfort control. |
 
+Render tuning ships an **Auto-detect** preset that reads the actual machine — discrete vs
+integrated GPU, thread count, heap size, maximum texture size — and picks a starting point
+from that rather than from a model-name lookup table that would be wrong for anything it
+hadn't seen.
+
+### Knowing where your frames go
+
+The **Hardware** HUD element reports GPU load and a verdict: *CPU bound*, *GPU bound* or
+*balanced*.
+
+This matters more than it sounds, because most Minecraft tuning advice is aimed at the wrong
+half of the pipeline. Vanilla Minecraft is overwhelmingly limited by chunk meshing, entity
+handling and draw-call submission — all CPU-side — long before it saturates a discrete GPU's
+shader units. If you are CPU bound, turning texture quality down does nothing; render
+distance, simulation distance, entity range and particle count are the levers. If you are GPU
+bound (usually because of shaders or a high resolution), the opposite holds.
+
+Two consequences baked into the defaults:
+
+- **No preset reduces mipmaps.** Dropping mipmap levels is a habit from cards with under a
+  gigabyte of VRAM. On anything modern it *costs* frames, because unmipmapped distant terrain
+  thrashes the texture cache. Every preset leaves it at 4.
+- **The aggressive presets cut CPU-side settings first** — render distance, simulation
+  distance, biome blend — rather than visual fidelity.
+
+GPU load is off by default. The game only measures it while its own `GPU_UTILIZATION` debug
+entry is active, so reading the figure means switching that entry on; the module does so only
+when you ask, and restores your previous setting when you turn it back off.
+
 ### HUD
 
 FPS · CPS · Ping · Coordinates · Memory · Clock · Keystrokes · Armour · Potions · Movement

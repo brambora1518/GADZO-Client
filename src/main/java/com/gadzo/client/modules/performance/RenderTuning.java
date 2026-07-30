@@ -6,6 +6,7 @@ import com.gadzo.client.core.module.ModuleCategory;
 import com.gadzo.client.core.setting.BooleanSetting;
 import com.gadzo.client.core.setting.EnumSetting;
 import com.gadzo.client.core.setting.NumberSetting;
+import com.gadzo.client.core.system.SystemProfile;
 import com.gadzo.client.util.Mc;
 
 import net.minecraft.client.CloudStatus;
@@ -28,6 +29,7 @@ public class RenderTuning extends Module {
     /** Named bundles of the settings below. */
     public enum Preset {
         CUSTOM("Custom"),
+        AUTO("Auto-detect"),
         QUALITY("Quality"),
         BALANCED("Balanced"),
         PERFORMANCE("Performance"),
@@ -81,7 +83,7 @@ public class RenderTuning extends Module {
         this.biomeBlend = addNumber("Biome blend", 2, 0, 7, 1,
                 "Smoothing between biome colours; costs chunk rebuild time");
         this.mipmap = addNumber("Mipmap levels", 4, 0, 4, 1,
-                "Texture detail reduction at distance");
+                "Leave at 4 unless VRAM-starved — lowering it usually costs frames, not saves them");
         this.particles = addEnum("Particles", ParticleStatus.ALL, "Vanilla particle detail");
         this.clouds = addEnum("Clouds", CloudStatus.FANCY, "Cloud rendering mode");
         this.ambientOcclusion = addBool("Ambient occlusion", true, "Soft corner shading");
@@ -110,15 +112,21 @@ public class RenderTuning extends Module {
         }
         applying = true;
         try {
+            // Mipmaps stay at 4 in every preset. Dropping them is a habit carried over from
+            // cards with under a gigabyte of VRAM; on anything modern it costs performance
+            // rather than saving it, because unmipmapped distant terrain thrashes the texture
+            // cache. The levers that actually pay are the CPU-side ones — render and
+            // simulation distance, entity range, biome blend.
             switch (value) {
                 case QUALITY -> set(16, 12, 150, 5, 4, ParticleStatus.ALL, CloudStatus.FANCY,
                         true, true, true, true);
                 case BALANCED -> set(12, 10, 100, 2, 4, ParticleStatus.DECREASED, CloudStatus.FAST,
                         true, true, true, true);
-                case PERFORMANCE -> set(8, 6, 75, 0, 2, ParticleStatus.DECREASED, CloudStatus.OFF,
+                case PERFORMANCE -> set(8, 6, 75, 0, 4, ParticleStatus.DECREASED, CloudStatus.OFF,
                         false, false, false, true);
-                case EXTREME -> set(5, 5, 50, 0, 0, ParticleStatus.MINIMAL, CloudStatus.OFF,
+                case EXTREME -> set(5, 5, 50, 0, 4, ParticleStatus.MINIMAL, CloudStatus.OFF,
                         false, false, false, false);
+                case AUTO -> applyAutoPreset();
                 default -> {
                     // CUSTOM is handled above.
                 }
@@ -127,6 +135,28 @@ public class RenderTuning extends Module {
             applying = false;
         }
         apply();
+    }
+
+    /**
+     * Picks values from the detected hardware tier.
+     *
+     * <p>Deliberately biased towards the CPU-side settings: Minecraft saturates draw-call
+     * submission and chunk meshing long before it saturates a discrete GPU's shader units, so
+     * a mid-range discrete card paired with a modest CPU wants a lower render distance rather
+     * than lower visual fidelity.
+     */
+    private void applyAutoPreset() {
+        SystemProfile.Tier tier = SystemProfile.detectTier();
+        switch (tier) {
+            case ULTRA -> set(20, 14, 150, 5, 4, ParticleStatus.ALL, CloudStatus.FANCY,
+                    true, true, true, true);
+            case HIGH -> set(14, 10, 125, 3, 4, ParticleStatus.ALL, CloudStatus.FANCY,
+                    true, true, true, true);
+            case MEDIUM -> set(10, 8, 100, 1, 4, ParticleStatus.DECREASED, CloudStatus.FAST,
+                    true, false, true, true);
+            case LOW -> set(7, 6, 75, 0, 4, ParticleStatus.DECREASED, CloudStatus.OFF,
+                    false, false, false, true);
+        }
     }
 
     private void set(int render, int simulation, int entity, int blend, int mip,
