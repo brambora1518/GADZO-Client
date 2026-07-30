@@ -7,7 +7,7 @@ import java.util.Locale;
 /**
  * Reference material for the Create mod.
  *
- * <p>Create is not available for Minecraft 26.2 — the Forge/NeoForge build stops at 1.21.1 and
+ * <p>Create is not available for MinecraftClient 26.2 — the Forge/NeoForge build stops at 1.21.1 and
  * the Fabric port at 1.20.1 — so none of this can be read from a live kinetic network. It is a
  * static reference, useful for planning a contraption or remembering a ratio.
  *

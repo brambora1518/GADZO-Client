@@ -6,9 +6,9 @@ import com.gadzo.client.core.setting.BooleanSetting;
 import com.gadzo.client.ui.Theme;
 import com.gadzo.client.util.Mc;
 
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.network.ClientPlayerEntity;
 
 /**
  * Horizontal movement speed in blocks per second.
@@ -19,7 +19,7 @@ import net.minecraft.client.player.LocalPlayer;
  */
 public class SpeedHud extends HudModule {
 
-    /** Minecraft runs 20 ticks per second. */
+    /** MinecraftClient runs 20 ticks per second. */
     private static final double TPS = 20.0;
 
     private final BooleanSetting includeVertical;
@@ -40,7 +40,7 @@ public class SpeedHud extends HudModule {
 
     @Override
     public void onTick() {
-        LocalPlayer player = Mc.player();
+        ClientPlayerEntity player = Mc.player();
         if (player == null) {
             primed = false;
             return;
@@ -75,18 +75,18 @@ public class SpeedHud extends HudModule {
     }
 
     @Override
-    public double contentWidth(Font font) {
+    public double contentWidth(TextRenderer font) {
         // Reserve a fixed width so the plate does not resize while running.
-        return font.width("00.00 m/s");
+        return font.getWidth("00.00 m/s");
     }
 
     @Override
-    public double contentHeight(Font font) {
-        return font.lineHeight;
+    public double contentHeight(TextRenderer font) {
+        return font.fontHeight;
     }
 
     @Override
-    protected void renderContent(GuiGraphicsExtractor gfx, Font font) {
+    protected void renderContent(DrawContext gfx, TextRenderer font) {
         line(gfx, font, text(), 0, 0, Theme.textPrimary());
     }
 }

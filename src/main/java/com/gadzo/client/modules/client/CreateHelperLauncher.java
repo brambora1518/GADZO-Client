@@ -10,7 +10,7 @@ import org.lwjgl.glfw.GLFW;
 /**
  * Opens the Create reference and stress planner.
  *
- * <p>Create has no build for Minecraft 26.2 — Forge/NeoForge stops at 1.21.1 and the Fabric
+ * <p>Create has no build for MinecraftClient 26.2 — Forge/NeoForge stops at 1.21.1 and the Fabric
  * port at 1.20.1 — so this is a planning tool rather than a live overlay. It is still worth
  * having in the client: the stress calculator answers "how many water wheels does this need"
  * without a spreadsheet, and the reference covers the parts of Create that trip people up

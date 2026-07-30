@@ -3,14 +3,14 @@ package com.gadzo.client.ui;
 import com.gadzo.client.util.ColorUtil;
 import com.gadzo.client.util.MathUtil;
 
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
 
 /**
  * Drawing primitives for the GADZO interface.
  *
- * <p>Minecraft 26's GUI is retained-mode: a screen submits draw commands to a
- * {@link GuiGraphicsExtractor} which batches them into a render state. That layer gives us
+ * <p>MinecraftClient 26's GUI is retained-mode: a screen submits draw commands to a
+ * {@link DrawContext} which batches them into a render state. That layer gives us
  * axis-aligned rectangles, vertical gradients, text and scissors — but no rounded corners,
  * which every surface in this client needs.
  *
@@ -30,7 +30,7 @@ public final class Render2D {
 
     // -- rectangles -----------------------------------------------------------------
 
-    public static void rect(GuiGraphicsExtractor gfx, double x, double y, double width, double height, int color) {
+    public static void rect(DrawContext gfx, double x, double y, double width, double height, int color) {
         if (width <= 0 || height <= 0 || ColorUtil.alpha(color) == 0) {
             return;
         }
@@ -38,7 +38,7 @@ public final class Render2D {
     }
 
     /** Vertical gradient; {@code top} and {@code bottom} are both ARGB. */
-    public static void gradientV(GuiGraphicsExtractor gfx, double x, double y, double width, double height,
+    public static void gradientV(DrawContext gfx, double x, double y, double width, double height,
                                  int top, int bottom) {
         if (width <= 0 || height <= 0) {
             return;
@@ -53,7 +53,7 @@ public final class Render2D {
      * {@code step}-wide columns. Two pixels per step is visually indistinguishable from one
      * at normal GUI scales and halves the draw calls.
      */
-    public static void gradientH(GuiGraphicsExtractor gfx, double x, double y, double width, double height,
+    public static void gradientH(DrawContext gfx, double x, double y, double width, double height,
                                  int left, int right) {
         if (width <= 0 || height <= 0) {
             return;
@@ -74,7 +74,7 @@ public final class Render2D {
 
     // -- rounded rectangles ----------------------------------------------------------
 
-    public static void roundedRect(GuiGraphicsExtractor gfx, double x, double y, double width, double height,
+    public static void roundedRect(DrawContext gfx, double x, double y, double width, double height,
                                    double radius, int color) {
         roundedRect(gfx, x, y, width, height, radius, radius, radius, radius, color);
     }
@@ -86,7 +86,7 @@ public final class Render2D {
      * primitive: a sidebar rounds only its left corners, a selected list row only its outer
      * pair, and so on.
      */
-    public static void roundedRect(GuiGraphicsExtractor gfx, double x, double y, double width, double height,
+    public static void roundedRect(DrawContext gfx, double x, double y, double width, double height,
                                    double topLeft, double topRight, double bottomRight, double bottomLeft,
                                    int color) {
         if (width <= 0 || height <= 0 || ColorUtil.alpha(color) == 0) {
@@ -141,7 +141,7 @@ public final class Render2D {
      * <p>The solid interior is a single fill; the fractional pixel at each end is drawn
      * separately with proportional alpha, which is where the anti-aliasing comes from.
      */
-    private static void span(GuiGraphicsExtractor gfx, int left, int right, int rowY,
+    private static void span(DrawContext gfx, int left, int right, int rowY,
                              double insetLeft, double insetRight, int color) {
         double startX = left + insetLeft;
         double endX = right - insetRight;
@@ -183,7 +183,7 @@ public final class Render2D {
     }
 
     /** Rounded rectangle with a vertical gradient, rasterised row by row. */
-    public static void roundedGradientV(GuiGraphicsExtractor gfx, double x, double y, double width, double height,
+    public static void roundedGradientV(DrawContext gfx, double x, double y, double width, double height,
                                         double radius, int top, int bottom) {
         if (width <= 0 || height <= 0) {
             return;
@@ -206,7 +206,7 @@ public final class Render2D {
     }
 
     /** Stroked rounded rectangle drawn as an outer shape masked by an inner one. */
-    public static void roundedOutline(GuiGraphicsExtractor gfx, double x, double y, double width, double height,
+    public static void roundedOutline(DrawContext gfx, double x, double y, double width, double height,
                                       double radius, double thickness, int color) {
         if (thickness <= 0 || width <= 0 || height <= 0) {
             return;
@@ -246,7 +246,7 @@ public final class Render2D {
      * would need an offscreen pass; at these radii the layered version is indistinguishable
      * and costs nothing outside the GUI batch.
      */
-    public static void shadow(GuiGraphicsExtractor gfx, double x, double y, double width, double height,
+    public static void shadow(DrawContext gfx, double x, double y, double width, double height,
                               double radius, int spread, int color) {
         int layers = Math.max(1, spread);
         int baseAlpha = ColorUtil.alpha(color);
@@ -262,46 +262,46 @@ public final class Render2D {
         }
     }
 
-    public static void circle(GuiGraphicsExtractor gfx, double centerX, double centerY, double radius, int color) {
+    public static void circle(DrawContext gfx, double centerX, double centerY, double radius, int color) {
         roundedRect(gfx, centerX - radius, centerY - radius, radius * 2, radius * 2, radius, color);
     }
 
     /** A horizontal 1px rule, used between menu sections. */
-    public static void separator(GuiGraphicsExtractor gfx, double x, double y, double width, int color) {
+    public static void separator(DrawContext gfx, double x, double y, double width, int color) {
         rect(gfx, x, y, width, 1, color);
     }
 
     // -- text ------------------------------------------------------------------------
 
-    public static void text(GuiGraphicsExtractor gfx, Font font, String value, double x, double y, int color) {
-        gfx.text(font, value, floor(x), floor(y), color, false);
+    public static void text(DrawContext gfx, TextRenderer font, String value, double x, double y, int color) {
+        gfx.drawText(font, value, floor(x), floor(y), color, false);
     }
 
-    public static void textShadowed(GuiGraphicsExtractor gfx, Font font, String value, double x, double y, int color) {
-        gfx.text(font, value, floor(x), floor(y), color, true);
+    public static void textShadowed(DrawContext gfx, TextRenderer font, String value, double x, double y, int color) {
+        gfx.drawText(font, value, floor(x), floor(y), color, true);
     }
 
-    public static void textCentered(GuiGraphicsExtractor gfx, Font font, String value,
+    public static void textCentered(DrawContext gfx, TextRenderer font, String value,
                                     double centerX, double y, int color, boolean shadow) {
-        gfx.text(font, value, floor(centerX - font.width(value) / 2.0), floor(y), color, shadow);
+        gfx.drawText(font, value, floor(centerX - font.getWidth(value) / 2.0), floor(y), color, shadow);
     }
 
-    public static void textRight(GuiGraphicsExtractor gfx, Font font, String value,
+    public static void textRight(DrawContext gfx, TextRenderer font, String value,
                                  double rightX, double y, int color, boolean shadow) {
-        gfx.text(font, value, floor(rightX - font.width(value)), floor(y), color, shadow);
+        gfx.drawText(font, value, floor(rightX - font.getWidth(value)), floor(y), color, shadow);
     }
 
     /** Truncates with an ellipsis so long module names cannot overflow their row. */
-    public static String truncate(Font font, String value, int maxWidth) {
-        if (font.width(value) <= maxWidth) {
+    public static String truncate(TextRenderer font, String value, int maxWidth) {
+        if (font.getWidth(value) <= maxWidth) {
             return value;
         }
         String ellipsis = "...";
-        int budget = maxWidth - font.width(ellipsis);
+        int budget = maxWidth - font.getWidth(ellipsis);
         if (budget <= 0) {
             return ellipsis;
         }
-        return font.plainSubstrByWidth(value, budget) + ellipsis;
+        return font.trimToWidth(value, budget) + ellipsis;
     }
 
     // -- helpers ----------------------------------------------------------------------
@@ -320,25 +320,23 @@ public final class Render2D {
      *
      * @return whether the blur was accepted
      */
-    public static boolean blurBehind(GuiGraphicsExtractor gfx) {
-        try {
-            gfx.blurBeforeThisStratum();
-            return true;
-        } catch (IllegalStateException alreadyBlurred) {
-            return false;
-        }
+    public static boolean blurBehind(DrawContext gfx) {
+        // Minecraft 1.20.1 has no GUI backdrop blur — the frosted-glass effect arrived with
+        // the render-state rework in later versions. Screens fall back to a dim overlay,
+        // which is why Theme.blurEnabled() has no visible effect on this branch.
+        return false;
     }
 
     /** Starts a new depth stratum so later draws sit cleanly above earlier ones. */
-    public static void layer(GuiGraphicsExtractor gfx) {
-        gfx.nextStratum();
+    public static void layer(DrawContext gfx) {
+        // No depth strata in 1.20.1; draw order alone decides layering.
     }
 
-    public static void pushScissor(GuiGraphicsExtractor gfx, double x, double y, double width, double height) {
+    public static void pushScissor(DrawContext gfx, double x, double y, double width, double height) {
         gfx.enableScissor(floor(x), floor(y), ceil(x + width), ceil(y + height));
     }
 
-    public static void popScissor(GuiGraphicsExtractor gfx) {
+    public static void popScissor(DrawContext gfx) {
         gfx.disableScissor();
     }
 

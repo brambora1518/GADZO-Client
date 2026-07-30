@@ -6,14 +6,14 @@ import com.gadzo.client.core.setting.BooleanSetting;
 import com.gadzo.client.ui.Theme;
 import com.gadzo.client.util.Mc;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.multiplayer.ServerData;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.core.Holder;
-import net.minecraft.world.level.biome.Biome;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.network.ServerInfo;
+import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.registry.entry.RegistryEntry;
+import net.minecraft.world.biome.Biome;
 
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -22,7 +22,7 @@ import java.util.Locale;
 /** Biome, in-game day number, and the server you are connected to. */
 public class WorldInfoHud extends HudModule {
 
-    /** Ticks in one Minecraft day. */
+    /** Ticks in one MinecraftClient day. */
     private static final long TICKS_PER_DAY = 24000L;
 
     private final BooleanSetting showBiome;
@@ -50,33 +50,33 @@ public class WorldInfoHud extends HudModule {
     }
 
     private String biomeName() {
-        LocalPlayer player = Mc.player();
-        Minecraft client = Mc.client();
-        if (player == null || client == null || client.level == null) {
+        ClientPlayerEntity player = Mc.player();
+        MinecraftClient client = Mc.client();
+        if (player == null || client == null || client.world == null) {
             return null;
         }
-        Holder<Biome> biome = client.level.getBiome(player.blockPosition());
+        RegistryEntry<Biome> biome = client.world.getBiome(player.getBlockPos());
         // Unregistered biomes (datapacks mid-reload) have no key; skip rather than show junk.
-        return biome.unwrapKey()
-                .map(key -> prettify(key.identifier().getPath()))
+        return biome.getKey()
+                .map(key -> prettify(key.getValue().getPath()))
                 .orElse(null);
     }
 
     private String serverName() {
-        Minecraft client = Mc.client();
+        MinecraftClient client = Mc.client();
         if (client == null) {
             return null;
         }
-        if (client.hasSingleplayerServer()) {
+        if (client.isInSingleplayer()) {
             return "Singleplayer";
         }
-        ServerData server = client.getCurrentServer();
-        return server == null ? null : server.ip;
+        ServerInfo server = client.getCurrentServerEntry();
+        return server == null ? null : server.address;
     }
 
     private List<String> lines() {
         List<String> lines = new ArrayList<>(3);
-        Minecraft client = Mc.client();
+        MinecraftClient client = Mc.client();
 
         if (showBiome.get()) {
             String biome = biomeName();
@@ -84,8 +84,8 @@ public class WorldInfoHud extends HudModule {
                 lines.add(biome);
             }
         }
-        if (showDay.get() && client != null && client.level != null) {
-            lines.add("Day " + (client.level.getDefaultClockTime() / TICKS_PER_DAY));
+        if (showDay.get() && client != null && client.world != null) {
+            lines.add("Day " + (client.world.getTimeOfDay() / TICKS_PER_DAY));
         }
         if (showServer.get()) {
             String server = serverName();
@@ -97,25 +97,25 @@ public class WorldInfoHud extends HudModule {
     }
 
     @Override
-    public double contentWidth(Font font) {
+    public double contentWidth(TextRenderer font) {
         double widest = 0;
         for (String line : lines()) {
-            widest = Math.max(widest, font.width(line));
+            widest = Math.max(widest, font.getWidth(line));
         }
         return widest;
     }
 
     @Override
-    public double contentHeight(Font font) {
-        return Math.max(0, lines().size()) * font.lineHeight;
+    public double contentHeight(TextRenderer font) {
+        return Math.max(0, lines().size()) * font.fontHeight;
     }
 
     @Override
-    protected void renderContent(GuiGraphicsExtractor gfx, Font font) {
+    protected void renderContent(DrawContext gfx, TextRenderer font) {
         double y = 0;
         for (String text : lines()) {
             line(gfx, font, text, 0, y, Theme.textPrimary());
-            y += font.lineHeight;
+            y += font.fontHeight;
         }
     }
 }

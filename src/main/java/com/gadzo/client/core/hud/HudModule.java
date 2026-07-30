@@ -9,8 +9,8 @@ import com.gadzo.client.ui.Render2D;
 import com.gadzo.client.ui.Theme;
 import com.gadzo.client.util.MathUtil;
 
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
 
 /**
  * A module that draws something on the in-game HUD.
@@ -69,13 +69,13 @@ public abstract class HudModule extends Module {
     // -- geometry ---------------------------------------------------------------------
 
     /** Width of the content, before scaling and padding. */
-    public abstract double contentWidth(Font font);
+    public abstract double contentWidth(TextRenderer font);
 
     /** Height of the content, before scaling and padding. */
-    public abstract double contentHeight(Font font);
+    public abstract double contentHeight(TextRenderer font);
 
     /** Paints the content with its top-left corner at the origin of the current transform. */
-    protected abstract void renderContent(GuiGraphicsExtractor gfx, Font font);
+    protected abstract void renderContent(DrawContext gfx, TextRenderer font);
 
     /** Inner padding around the content when the background plate is drawn. */
     protected double padding() {
@@ -112,11 +112,11 @@ public abstract class HudModule extends Module {
     }
 
     /** Total on-screen width including padding and scale. */
-    public double totalWidth(Font font) {
+    public double totalWidth(TextRenderer font) {
         return (contentWidth(font) + padding() * 2) * getScale();
     }
 
-    public double totalHeight(Font font) {
+    public double totalHeight(TextRenderer font) {
         return (contentHeight(font) + padding() * 2) * getScale();
     }
 
@@ -126,12 +126,12 @@ public abstract class HudModule extends Module {
      * <p>The element is shifted by its own size scaled by the anchor factor, so a
      * right-anchored element grows leftwards instead of off the screen edge.
      */
-    public double resolveX(Font font, int screenWidth) {
+    public double resolveX(TextRenderer font, int screenWidth) {
         HudAnchor a = getAnchor();
         return a.originX(screenWidth) + offsetX - totalWidth(font) * a.xFactor();
     }
 
-    public double resolveY(Font font, int screenHeight) {
+    public double resolveY(TextRenderer font, int screenHeight) {
         HudAnchor a = getAnchor();
         return a.originY(screenHeight) + offsetY - totalHeight(font) * a.yFactor();
     }
@@ -142,7 +142,7 @@ public abstract class HudModule extends Module {
      * <p>The HUD editor calls this while dragging; the anchor stays fixed during the drag and
      * is only re-picked on release.
      */
-    public void moveTopLeftTo(Font font, double x, double y, int screenWidth, int screenHeight) {
+    public void moveTopLeftTo(TextRenderer font, double x, double y, int screenWidth, int screenHeight) {
         HudAnchor a = getAnchor();
         this.offsetX = x - a.originX(screenWidth) + totalWidth(font) * a.xFactor();
         this.offsetY = y - a.originY(screenHeight) + totalHeight(font) * a.yFactor();
@@ -154,7 +154,7 @@ public abstract class HudModule extends Module {
      * <p>Called when a drag ends so the element picks up sensible resize behaviour without
      * appearing to jump.
      */
-    public void reanchor(Font font, int screenWidth, int screenHeight) {
+    public void reanchor(TextRenderer font, int screenWidth, int screenHeight) {
         double x = lastX;
         double y = lastY;
         double centerX = x + totalWidth(font) / 2.0;
@@ -164,7 +164,7 @@ public abstract class HudModule extends Module {
     }
 
     /** Keeps the element fully on screen after a resolution change. */
-    public void clampToScreen(Font font, int screenWidth, int screenHeight) {
+    public void clampToScreen(TextRenderer font, int screenWidth, int screenHeight) {
         double width = totalWidth(font);
         double height = totalHeight(font);
         double x = MathUtil.clamp(resolveX(font, screenWidth), 0, Math.max(0, screenWidth - width));
@@ -201,7 +201,7 @@ public abstract class HudModule extends Module {
      *
      * @param editorAlpha extra fade applied by the HUD editor; 1 during normal play
      */
-    public void render(GuiGraphicsExtractor gfx, Font font, int screenWidth, int screenHeight, double editorAlpha) {
+    public void render(DrawContext gfx, TextRenderer font, int screenWidth, int screenHeight, double editorAlpha) {
         double width = totalWidth(font);
         double height = totalHeight(font);
         double x = resolveX(font, screenWidth);
@@ -224,17 +224,17 @@ public abstract class HudModule extends Module {
             }
         }
 
-        gfx.pose().pushMatrix();
-        gfx.pose().translate((float) (x + pad * s), (float) (y + pad * s));
+        gfx.getMatrices().push();
+        gfx.getMatrices().translate((float) (x + pad * s), (float) (y + pad * s), 0.0f);
         if (s != 1.0) {
-            gfx.pose().scale((float) s, (float) s);
+            gfx.getMatrices().scale((float) s, (float) s, 1.0f);
         }
         renderContent(gfx, font);
-        gfx.pose().popMatrix();
+        gfx.getMatrices().pop();
     }
 
     /** Convenience for subclasses: draws a line of text honouring the shadow setting. */
-    protected void line(GuiGraphicsExtractor gfx, Font font, String value, double x, double y, int color) {
-        gfx.text(font, value, (int) Math.floor(x), (int) Math.floor(y), color, hasTextShadow());
+    protected void line(DrawContext gfx, TextRenderer font, String value, double x, double y, int color) {
+        gfx.drawText(font, value, (int) Math.floor(x), (int) Math.floor(y), color, hasTextShadow());
     }
 }

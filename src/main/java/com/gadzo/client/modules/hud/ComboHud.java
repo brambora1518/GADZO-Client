@@ -7,8 +7,8 @@ import com.gadzo.client.core.module.ModuleCategory;
 import com.gadzo.client.core.setting.BooleanSetting;
 import com.gadzo.client.ui.Theme;
 
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
 
 /** Consecutive-hit counter, hidden while no combo is running. */
 public class ComboHud extends HudModule {
@@ -31,17 +31,17 @@ public class ComboHud extends HudModule {
     }
 
     @Override
-    public double contentWidth(Font font) {
-        return visible() ? font.width(text()) : 0;
+    public double contentWidth(TextRenderer font) {
+        return visible() ? font.getWidth(text()) : 0;
     }
 
     @Override
-    public double contentHeight(Font font) {
-        return visible() ? font.lineHeight : 0;
+    public double contentHeight(TextRenderer font) {
+        return visible() ? font.fontHeight : 0;
     }
 
     @Override
-    protected void renderContent(GuiGraphicsExtractor gfx, Font font) {
+    protected void renderContent(DrawContext gfx, TextRenderer font) {
         if (!visible()) {
             return;
         }

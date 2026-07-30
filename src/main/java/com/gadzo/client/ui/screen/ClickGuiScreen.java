@@ -13,12 +13,9 @@ import com.gadzo.client.util.ColorUtil;
 import com.gadzo.client.util.Easing;
 import com.gadzo.client.util.MathUtil;
 
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.CharacterEvent;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.network.chat.Component;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.text.Text;
 
 import org.lwjgl.glfw.GLFW;
 
@@ -66,7 +63,7 @@ public class ClickGuiScreen extends Screen {
     private double windowY;
 
     public ClickGuiScreen() {
-        super(Component.literal("GADZO"));
+        super(Text.literal("GADZO"));
         for (ModuleCategory category : ModuleCategory.values()) {
             categoryHover.put(category, new Animation(0.0, 160L));
         }
@@ -80,7 +77,7 @@ public class ClickGuiScreen extends Screen {
     }
 
     @Override
-    public boolean isPauseScreen() {
+    public boolean shouldPause() {
         return false;
     }
 
@@ -122,7 +119,7 @@ public class ClickGuiScreen extends Screen {
      */
     private double settingsFirstRowY() {
         // Header block: title line, description line, separator, then the row area.
-        return listTop() + 8 - settingsScroll + (font.lineHeight + 2) + (font.lineHeight + 8) + 8;
+        return listTop() + 8 - settingsScroll + (textRenderer.fontHeight + 2) + (textRenderer.fontHeight + 8) + 8;
     }
 
     /** Modules shown in the list for the current category and search query. */
@@ -151,8 +148,7 @@ public class ClickGuiScreen extends Screen {
      * background also requests a blur, and the GUI render state allows only one per frame —
      * overriding replaces that request instead of adding a second one that would throw.
      */
-    @Override
-    public void extractBackground(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
+    private void drawBackdrop(DrawContext gfx) {
         double open = openAnimation.value();
         if (Theme.blurEnabled()) {
             Render2D.blurBehind(gfx);
@@ -162,7 +158,8 @@ public class ClickGuiScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
+    public void render(DrawContext gfx, int mouseX, int mouseY, float partialTick) {
+        drawBackdrop(gfx);
         windowX = (width - WINDOW_WIDTH) / 2.0;
         windowY = (height - WINDOW_HEIGHT) / 2.0;
 
@@ -170,15 +167,15 @@ public class ClickGuiScreen extends Screen {
 
         // Slide the window up slightly as it fades in.
         double slide = (1.0 - open) * 18.0;
-        gfx.pose().pushMatrix();
-        gfx.pose().translate(0.0f, (float) slide);
+        gfx.getMatrices().push();
+        gfx.getMatrices().translate(0.0f, (float) slide, 0.0f);
 
         drawWindow(gfx, mouseX, mouseY, open);
 
-        gfx.pose().popMatrix();
+        gfx.getMatrices().pop();
     }
 
-    private void drawWindow(GuiGraphicsExtractor gfx, int mouseX, int mouseY, double alpha) {
+    private void drawWindow(DrawContext gfx, int mouseX, int mouseY, double alpha) {
         Render2D.shadow(gfx, windowX, windowY, WINDOW_WIDTH, WINDOW_HEIGHT, Theme.radius(), 10,
                 ColorUtil.fade(Theme.shadowColor(), alpha));
         Render2D.roundedRect(gfx, windowX, windowY, WINDOW_WIDTH, WINDOW_HEIGHT, Theme.radius(),
@@ -191,15 +188,15 @@ public class ClickGuiScreen extends Screen {
         drawFooter(gfx, alpha);
     }
 
-    private void drawSidebar(GuiGraphicsExtractor gfx, int mouseX, int mouseY, double alpha) {
+    private void drawSidebar(DrawContext gfx, int mouseX, int mouseY, double alpha) {
         Render2D.roundedRect(gfx, windowX, windowY, SIDEBAR_WIDTH, WINDOW_HEIGHT,
                 Theme.radius(), 0, 0, Theme.radius(),
                 ColorUtil.fade(Theme.surface(), alpha));
 
         // Wordmark.
-        Render2D.text(gfx, font, "GADZO", windowX + PADDING + 2, windowY + 16,
+        Render2D.text(gfx, textRenderer, "GADZO", windowX + PADDING + 2, windowY + 16,
                 ColorUtil.fade(Theme.accent(), alpha));
-        Render2D.text(gfx, font, "CLIENT", windowX + PADDING + 2 + font.width("GADZO") + 4,
+        Render2D.text(gfx, textRenderer, "CLIENT", windowX + PADDING + 2 + textRenderer.getWidth("GADZO") + 4,
                 windowY + 16, ColorUtil.fade(Theme.textMuted(), alpha));
 
         double y = windowY + HEADER_HEIGHT;
@@ -223,21 +220,21 @@ public class ClickGuiScreen extends Screen {
                         ColorUtil.fade(Theme.accent(), alpha));
             }
 
-            Render2D.text(gfx, font, category.displayName(), windowX + 18, y + (28 - font.lineHeight) / 2.0,
+            Render2D.text(gfx, textRenderer, category.displayName(), windowX + 18, y + (28 - textRenderer.fontHeight) / 2.0,
                     ColorUtil.fade(selected ? Theme.textPrimary() : Theme.textSecondary(), alpha));
 
             long enabled = GadzoClient.modules().byCategory(category).stream()
                     .filter(Module::isEnabled).count();
             if (enabled > 0) {
-                Render2D.textRight(gfx, font, Long.toString(enabled), windowX + SIDEBAR_WIDTH - 14,
-                        y + (28 - font.lineHeight) / 2.0,
+                Render2D.textRight(gfx, textRenderer, Long.toString(enabled), windowX + SIDEBAR_WIDTH - 14,
+                        y + (28 - textRenderer.fontHeight) / 2.0,
                         ColorUtil.fade(Theme.accent(), alpha), false);
             }
             y += 30;
         }
     }
 
-    private void drawHeader(GuiGraphicsExtractor gfx, int mouseX, int mouseY, double alpha) {
+    private void drawHeader(DrawContext gfx, int mouseX, int mouseY, double alpha) {
         double x = contentX() + PADDING;
         double y = windowY + 13;
         double boxWidth = contentWidth() - PADDING * 2;
@@ -254,13 +251,13 @@ public class ClickGuiScreen extends Screen {
                 ? "Search modules..."
                 : searchQuery + (searchFocused && (System.currentTimeMillis() / 500) % 2 == 0 ? "_" : "");
         int textColor = searchQuery.isEmpty() && !searchFocused ? Theme.textMuted() : Theme.textPrimary();
-        Render2D.text(gfx, font, display, x + 7, y + 6, ColorUtil.fade(textColor, alpha));
+        Render2D.text(gfx, textRenderer, display, x + 7, y + 6, ColorUtil.fade(textColor, alpha));
 
         Render2D.separator(gfx, contentX(), windowY + HEADER_HEIGHT - 1, contentWidth(),
                 ColorUtil.fade(Theme.border(), alpha));
     }
 
-    private void drawModuleList(GuiGraphicsExtractor gfx, int mouseX, int mouseY, double alpha) {
+    private void drawModuleList(DrawContext gfx, int mouseX, int mouseY, double alpha) {
         List<Module> modules = visibleModules();
         double x = contentX() + PADDING;
         double width = listWidth() - PADDING * 1.5;
@@ -280,14 +277,14 @@ public class ClickGuiScreen extends Screen {
         }
 
         if (modules.isEmpty()) {
-            Render2D.textCentered(gfx, font, "No modules match that search",
+            Render2D.textCentered(gfx, textRenderer, "No modules match that search",
                     contentX() + listWidth() / 2.0, top + 20,
                     ColorUtil.fade(Theme.textMuted(), alpha), false);
         }
         Render2D.popScissor(gfx);
     }
 
-    private void drawModuleRow(GuiGraphicsExtractor gfx, Module module, double x, double y, double width,
+    private void drawModuleRow(DrawContext gfx, Module module, double x, double y, double width,
                                int mouseX, int mouseY, double alpha) {
         boolean hovered = MathUtil.within(mouseX, mouseY, x, y, x + width, y + MODULE_ROW_HEIGHT);
         boolean selected = module == selectedModule;
@@ -314,20 +311,20 @@ public class ClickGuiScreen extends Screen {
 
         double textX = x + 11;
         double nameWidth = width - 52;
-        Render2D.text(gfx, font, Render2D.truncate(font, module.getName(), (int) nameWidth),
+        Render2D.text(gfx, textRenderer, Render2D.truncate(textRenderer, module.getName(), (int) nameWidth),
                 textX, y + 6, ColorUtil.fade(Theme.textPrimary(), alpha));
-        Render2D.text(gfx, font, Render2D.truncate(font, module.getDescription(), (int) nameWidth),
+        Render2D.text(gfx, textRenderer, Render2D.truncate(textRenderer, module.getDescription(), (int) nameWidth),
                 textX, y + 18, ColorUtil.fade(Theme.textMuted(), alpha));
 
         if (module.isPermanent()) {
-            Render2D.textRight(gfx, font, "always on", x + width - 10, y + 12,
+            Render2D.textRight(gfx, textRenderer, "always on", x + width - 10, y + 12,
                     ColorUtil.fade(Theme.textMuted(), alpha), false);
         } else {
             drawSmallToggle(gfx, x + width - 34, y + (MODULE_ROW_HEIGHT - 14) / 2.0, toggle.value(), alpha);
         }
     }
 
-    private void drawSmallToggle(GuiGraphicsExtractor gfx, double x, double y, double t, double alpha) {
+    private void drawSmallToggle(DrawContext gfx, double x, double y, double t, double alpha) {
         double w = 26;
         double h = 14;
         int track = ColorUtil.mix(Theme.trackOff(), Theme.accent(), t);
@@ -336,7 +333,7 @@ public class ClickGuiScreen extends Screen {
                 ColorUtil.fade(0xFFFFFFFF, alpha));
     }
 
-    private void drawSettingsPanel(GuiGraphicsExtractor gfx, int mouseX, int mouseY, double alpha) {
+    private void drawSettingsPanel(DrawContext gfx, int mouseX, int mouseY, double alpha) {
         double x = settingsX();
         double width = settingsWidth();
         double top = listTop();
@@ -345,7 +342,7 @@ public class ClickGuiScreen extends Screen {
         Render2D.rect(gfx, x, top, 1, bottom - top, ColorUtil.fade(Theme.border(), alpha));
 
         if (selectedModule == null) {
-            Render2D.textCentered(gfx, font, "Select a module", x + width / 2.0,
+            Render2D.textCentered(gfx, textRenderer, "Select a module", x + width / 2.0,
                     top + (bottom - top) / 2.0 - 4, ColorUtil.fade(Theme.textMuted(), alpha), false);
             return;
         }
@@ -356,42 +353,42 @@ public class ClickGuiScreen extends Screen {
         Render2D.pushScissor(gfx, x + 1, top, width - 1, bottom - top);
         double y = top + 8 - settingsScroll;
 
-        Render2D.text(gfx, font, Render2D.truncate(font, selectedModule.getName(), (int) innerWidth),
+        Render2D.text(gfx, textRenderer, Render2D.truncate(textRenderer, selectedModule.getName(), (int) innerWidth),
                 innerX, y, ColorUtil.fade(Theme.textPrimary(), alpha));
-        y += font.lineHeight + 2;
-        Render2D.text(gfx, font, Render2D.truncate(font, selectedModule.getDescription(), (int) innerWidth),
+        y += textRenderer.fontHeight + 2;
+        Render2D.text(gfx, textRenderer, Render2D.truncate(textRenderer, selectedModule.getDescription(), (int) innerWidth),
                 innerX, y, ColorUtil.fade(Theme.textMuted(), alpha));
-        y += font.lineHeight + 8;
+        y += textRenderer.fontHeight + 8;
 
         Render2D.separator(gfx, innerX, y, innerWidth, ColorUtil.fade(Theme.border(), alpha));
         y = settingsFirstRowY();
 
         // Keybind row first: it is the one control every module has.
-        SettingRenderer.render(gfx, font, selectedModule.getKeybind(), innerX, y, innerWidth, mouseX, mouseY);
+        SettingRenderer.render(gfx, textRenderer, selectedModule.getKeybind(), innerX, y, innerWidth, mouseX, mouseY);
         y += SettingRenderer.ROW_HEIGHT;
 
         for (Setting<?> setting : selectedModule.getVisibleSettings()) {
-            SettingRenderer.render(gfx, font, setting, innerX, y, innerWidth, mouseX, mouseY);
-            y += SettingRenderer.ROW_HEIGHT + SettingRenderer.extraHeight(setting, font);
+            SettingRenderer.render(gfx, textRenderer, setting, innerX, y, innerWidth, mouseX, mouseY);
+            y += SettingRenderer.ROW_HEIGHT + SettingRenderer.extraHeight(setting, textRenderer);
         }
 
         Render2D.popScissor(gfx);
     }
 
-    private void drawFooter(GuiGraphicsExtractor gfx, double alpha) {
+    private void drawFooter(DrawContext gfx, double alpha) {
         double y = windowY + WINDOW_HEIGHT - FOOTER_HEIGHT;
         Render2D.separator(gfx, contentX(), y, contentWidth(), ColorUtil.fade(Theme.border(), alpha));
 
         // Under Performance, show what the machine is doing rather than the profile name —
         // that is the context a player needs while changing these settings.
         String left = selectedCategory == ModuleCategory.PERFORMANCE && searchQuery.isBlank()
-                ? SystemProfile.detectTier() + " tier  ·  " + SystemProfile.bottleneck().label()
+                ? SystemProfile.detectTier() + " tier  ·  " + SystemProfile.cpuThreads() + " threads"
                 : GadzoClient.modules().enabledCount() + " enabled  ·  profile: "
                         + ConfigManager.activeProfile();
 
-        Render2D.text(gfx, font, Render2D.truncate(font, left, (int) (contentWidth() - 90)),
+        Render2D.text(gfx, textRenderer, Render2D.truncate(textRenderer, left, (int) (contentWidth() - 90)),
                 contentX() + PADDING, y + 9, ColorUtil.fade(Theme.textMuted(), alpha));
-        Render2D.textRight(gfx, font, "v" + GadzoClient.VERSION,
+        Render2D.textRight(gfx, textRenderer, "v" + GadzoClient.VERSION,
                 windowX + WINDOW_WIDTH - PADDING, y + 9,
                 ColorUtil.fade(Theme.textMuted(), alpha), false);
     }
@@ -405,9 +402,9 @@ public class ClickGuiScreen extends Screen {
     // -- input ---------------------------------------------------------------------------------
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        double mouseX = event.x();
-        double mouseY = event.y();
+    public boolean mouseClicked(double clickX, double clickY, int button) {
+        double mouseX = clickX;
+        double mouseY = clickY;
 
         // Search box.
         double searchX = contentX() + PADDING;
@@ -419,7 +416,7 @@ public class ClickGuiScreen extends Screen {
             return true;
         }
 
-        if (handleSettingsClick(mouseX, mouseY, event.button())) {
+        if (handleSettingsClick(mouseX, mouseY, button)) {
             return true;
         }
         // A click outside an open popup closes it rather than falling through.
@@ -430,10 +427,10 @@ public class ClickGuiScreen extends Screen {
         if (handleSidebarClick(mouseX, mouseY)) {
             return true;
         }
-        if (handleModuleListClick(mouseX, mouseY, event.button())) {
+        if (handleModuleListClick(mouseX, mouseY, button)) {
             return true;
         }
-        return super.mouseClicked(event, doubleClick);
+        return super.mouseClicked(clickX, clickY, button);
     }
 
     private boolean handleSidebarClick(double mouseX, double mouseY) {
@@ -483,39 +480,39 @@ public class ClickGuiScreen extends Screen {
         double innerWidth = settingsWidth() - PADDING * 2;
         double y = settingsFirstRowY();
 
-        if (SettingRenderer.mouseClicked(selectedModule.getKeybind(), font, innerX, y, innerWidth,
+        if (SettingRenderer.mouseClicked(selectedModule.getKeybind(), textRenderer, innerX, y, innerWidth,
                 mouseX, mouseY, button)) {
             return true;
         }
         y += SettingRenderer.ROW_HEIGHT;
 
         for (Setting<?> setting : selectedModule.getVisibleSettings()) {
-            if (SettingRenderer.mouseClicked(setting, font, innerX, y, innerWidth, mouseX, mouseY, button)) {
+            if (SettingRenderer.mouseClicked(setting, textRenderer, innerX, y, innerWidth, mouseX, mouseY, button)) {
                 return true;
             }
-            y += SettingRenderer.ROW_HEIGHT + SettingRenderer.extraHeight(setting, font);
+            y += SettingRenderer.ROW_HEIGHT + SettingRenderer.extraHeight(setting, textRenderer);
         }
         return false;
     }
 
     @Override
-    public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
+    public boolean mouseDragged(double clickX, double clickY, int button, double deltaX, double deltaY) {
         if (SettingRenderer.isDragging()) {
             SettingRenderer.mouseDragged(settingsX() + PADDING, settingsWidth() - PADDING * 2,
-                    event.x(), event.y());
+                    clickX, clickY);
             return true;
         }
-        return super.mouseDragged(event, deltaX, deltaY);
+        return super.mouseDragged(clickX, clickY, button, deltaX, deltaY);
     }
 
     @Override
-    public boolean mouseReleased(MouseButtonEvent event) {
+    public boolean mouseReleased(double clickX, double clickY, int button) {
         SettingRenderer.releaseDrag();
-        return super.mouseReleased(event);
+        return super.mouseReleased(clickX, clickY, button);
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double horizontal, double vertical) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double vertical) {
         double amount = vertical * 18;
         if (mouseX >= settingsX()) {
             settingsScroll = Math.max(0, settingsScroll - amount);
@@ -526,27 +523,27 @@ public class ClickGuiScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(KeyEvent event) {
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         // A listening keybind row swallows every key, including escape, so it can be cleared.
         if (selectedModule != null) {
-            if (SettingRenderer.keyPressed(selectedModule.getKeybind(), event.key())) {
+            if (SettingRenderer.keyPressed(selectedModule.getKeybind(), keyCode)) {
                 return true;
             }
             for (Setting<?> setting : selectedModule.getVisibleSettings()) {
-                if (SettingRenderer.keyPressed(setting, event.key())) {
+                if (SettingRenderer.keyPressed(setting, keyCode)) {
                     return true;
                 }
             }
         }
 
         if (searchFocused) {
-            if (event.key() == GLFW.GLFW_KEY_BACKSPACE) {
+            if (keyCode == GLFW.GLFW_KEY_BACKSPACE) {
                 if (!searchQuery.isEmpty()) {
                     searchQuery = searchQuery.substring(0, searchQuery.length() - 1);
                 }
                 return true;
             }
-            if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
                 if (!searchQuery.isEmpty()) {
                     searchQuery = "";
                 } else {
@@ -555,24 +552,24 @@ public class ClickGuiScreen extends Screen {
                 return true;
             }
         }
-        return super.keyPressed(event);
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override
-    public boolean charTyped(CharacterEvent event) {
+    public boolean charTyped(char chr, int modifiers) {
         if (searchFocused) {
-            searchQuery += event.codepointAsString();
+            searchQuery += String.valueOf(chr);
             listScroll = 0;
             return true;
         }
-        return super.charTyped(event);
+        return super.charTyped(chr, modifiers);
     }
 
     @Override
-    public void onClose() {
+    public void close() {
         SettingRenderer.closePopups();
         SettingRenderer.releaseDrag();
         ConfigManager.save();
-        super.onClose();
+        super.close();
     }
 }

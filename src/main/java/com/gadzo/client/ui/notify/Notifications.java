@@ -5,11 +5,10 @@ import com.gadzo.client.ui.Render2D;
 import com.gadzo.client.ui.Theme;
 import com.gadzo.client.util.ColorUtil;
 
-import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
-import net.minecraft.client.DeltaTracker;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
 
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -37,7 +36,7 @@ public final class Notifications {
     }
 
     public static void register() {
-        HudElementRegistry.addLast(GadzoClient.id("notifications"), Notifications::render);
+        HudRenderCallback.EVENT.register(Notifications::render);
     }
 
     public static void info(String title, String message) {
@@ -61,7 +60,7 @@ public final class Notifications {
         // Retire the oldest rather than refusing the newest: the most recent event is the
         // one the player is most likely waiting on.
         while (ACTIVE.size() > MAX_VISIBLE) {
-            ACTIVE.getFirst().beginDismiss();
+            ACTIVE.get(0).beginDismiss();
             break;
         }
     }
@@ -70,16 +69,16 @@ public final class Notifications {
         ACTIVE.clear();
     }
 
-    private static synchronized void render(GuiGraphicsExtractor gfx, DeltaTracker delta) {
+    private static synchronized void render(DrawContext gfx, float tickDelta) {
         if (ACTIVE.isEmpty()) {
             return;
         }
-        Minecraft client = Minecraft.getInstance();
+        MinecraftClient client = MinecraftClient.getInstance();
         if (client == null) {
             return;
         }
-        Font font = client.font;
-        int screenWidth = client.getWindow().getGuiScaledWidth();
+        TextRenderer font = client.textRenderer;
+        int screenWidth = client.getWindow().getScaledWidth();
 
         Iterator<Notification> iterator = ACTIVE.iterator();
         while (iterator.hasNext()) {
@@ -106,7 +105,7 @@ public final class Notifications {
         }
     }
 
-    private static void drawToast(GuiGraphicsExtractor gfx, Font font, Notification notification,
+    private static void drawToast(DrawContext gfx, TextRenderer font, Notification notification,
                                   double x, double y, double alpha) {
         int accent = notification.level().color();
 

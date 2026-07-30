@@ -11,10 +11,10 @@ import com.gadzo.client.ui.notify.Notifications;
 import com.mojang.brigadier.arguments.StringArgumentType;
 
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
-import net.fabricmc.fabric.api.client.command.v2.ClientCommands;
+import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
-import net.minecraft.ChatFormatting;
-import net.minecraft.network.chat.Component;
+import net.minecraft.util.Formatting;
+import net.minecraft.text.Text;
 
 import java.util.List;
 import java.util.Locale;
@@ -36,38 +36,38 @@ public final class GadzoCommands {
 
     public static void register() {
         ClientCommandRegistrationCallback.EVENT.register((dispatcher, context) ->
-                dispatcher.register(ClientCommands.literal("gadzo")
+                dispatcher.register(ClientCommandManager.literal("gadzo")
                         .executes(ctx -> showHelp(ctx.getSource()))
 
-                        .then(ClientCommands.literal("help")
+                        .then(ClientCommandManager.literal("help")
                                 .executes(ctx -> showHelp(ctx.getSource())))
 
-                        .then(ClientCommands.literal("list")
+                        .then(ClientCommandManager.literal("list")
                                 .executes(ctx -> listModules(ctx.getSource(), null))
-                                .then(ClientCommands.argument("category", StringArgumentType.word())
+                                .then(ClientCommandManager.argument("category", StringArgumentType.word())
                                         .executes(ctx -> listModules(ctx.getSource(),
                                                 StringArgumentType.getString(ctx, "category")))))
 
-                        .then(ClientCommands.literal("toggle")
-                                .then(ClientCommands.argument("module", StringArgumentType.greedyString())
+                        .then(ClientCommandManager.literal("toggle")
+                                .then(ClientCommandManager.argument("module", StringArgumentType.greedyString())
                                         .executes(ctx -> toggleModule(ctx.getSource(),
                                                 StringArgumentType.getString(ctx, "module")))))
 
-                        .then(ClientCommands.literal("profile")
+                        .then(ClientCommandManager.literal("profile")
                                 .executes(ctx -> showProfiles(ctx.getSource()))
-                                .then(ClientCommands.literal("save")
-                                        .then(ClientCommands.argument("name", StringArgumentType.word())
+                                .then(ClientCommandManager.literal("save")
+                                        .then(ClientCommandManager.argument("name", StringArgumentType.word())
                                                 .executes(ctx -> saveProfile(ctx.getSource(),
                                                         StringArgumentType.getString(ctx, "name")))))
-                                .then(ClientCommands.literal("load")
-                                        .then(ClientCommands.argument("name", StringArgumentType.word())
+                                .then(ClientCommandManager.literal("load")
+                                        .then(ClientCommandManager.argument("name", StringArgumentType.word())
                                                 .executes(ctx -> loadProfile(ctx.getSource(),
                                                         StringArgumentType.getString(ctx, "name"))))))
 
-                        .then(ClientCommands.literal("hardware")
+                        .then(ClientCommandManager.literal("hardware")
                                 .executes(ctx -> showHardware(ctx.getSource())))
 
-                        .then(ClientCommands.literal("save")
+                        .then(ClientCommandManager.literal("save")
                                 .executes(ctx -> {
                                     ConfigManager.save();
                                     feedback(ctx.getSource(), "Saved profile '"
@@ -79,12 +79,12 @@ public final class GadzoCommands {
     // -- helpers -------------------------------------------------------------------------
 
     private static void feedback(FabricClientCommandSource source, String message) {
-        source.sendFeedback(Component.literal("[GADZO] ").withStyle(ChatFormatting.AQUA)
-                .append(Component.literal(message).withStyle(ChatFormatting.WHITE)));
+        source.sendFeedback(Text.literal("[GADZO] ").formatted(Formatting.AQUA)
+                .append(Text.literal(message).formatted(Formatting.WHITE)));
     }
 
     private static void error(FabricClientCommandSource source, String message) {
-        source.sendError(Component.literal("[GADZO] " + message));
+        source.sendError(Text.literal("[GADZO] " + message));
     }
 
     /** Normalises a name so "Entity culling", "entity_culling" and "ENTITYCULLING" all match. */
@@ -161,11 +161,11 @@ public final class GadzoCommands {
             if (module.isHidden() || (filter != null && module.getCategory() != filter)) {
                 continue;
             }
-            source.sendFeedback(Component.literal("  " + (module.isEnabled() ? "[on]  " : "[off] "))
-                    .withStyle(module.isEnabled() ? ChatFormatting.GREEN : ChatFormatting.DARK_GRAY)
-                    .append(Component.literal(module.getName()).withStyle(ChatFormatting.WHITE))
-                    .append(Component.literal("  " + module.getCategory().displayName())
-                            .withStyle(ChatFormatting.DARK_GRAY)));
+            source.sendFeedback(Text.literal("  " + (module.isEnabled() ? "[on]  " : "[off] "))
+                    .formatted(module.isEnabled() ? Formatting.GREEN : Formatting.DARK_GRAY)
+                    .append(Text.literal(module.getName()).formatted(Formatting.WHITE))
+                    .append(Text.literal("  " + module.getCategory().displayName())
+                            .formatted(Formatting.DARK_GRAY)));
             shown++;
         }
         feedback(source, shown + " module(s).");
@@ -190,9 +190,9 @@ public final class GadzoCommands {
     private static int showProfiles(FabricClientCommandSource source) {
         feedback(source, "Active profile: " + ConfigManager.activeProfile());
         for (String profile : ConfigManager.listProfiles()) {
-            source.sendFeedback(Component.literal("  " + profile)
-                    .withStyle(profile.equals(ConfigManager.activeProfile())
-                            ? ChatFormatting.AQUA : ChatFormatting.GRAY));
+            source.sendFeedback(Text.literal("  " + profile)
+                    .formatted(profile.equals(ConfigManager.activeProfile())
+                            ? Formatting.AQUA : Formatting.GRAY));
         }
         return 1;
     }
@@ -220,12 +220,11 @@ public final class GadzoCommands {
                 + (SystemProfile.physicalRamMb() > 0
                         ? " of " + SystemProfile.physicalRamMb() + " MB system RAM" : ""));
         feedback(source, "Tier: " + SystemProfile.detectTier());
-        feedback(source, "Bottleneck: " + SystemProfile.bottleneck().label()
-                + " — " + SystemProfile.bottleneck().advice());
+        feedback(source, "GPU timing is not available on Minecraft 1.20.1.");
 
         String advice = SystemProfile.heapAdvice();
         if (advice != null) {
-            source.sendFeedback(Component.literal("[GADZO] " + advice).withStyle(ChatFormatting.YELLOW));
+            source.sendFeedback(Text.literal("[GADZO] " + advice).formatted(Formatting.YELLOW));
         }
         return 1;
     }

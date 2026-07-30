@@ -6,8 +6,8 @@ import com.gadzo.client.core.setting.EnumSetting;
 import com.gadzo.client.ui.Theme;
 import com.gadzo.client.util.Mc;
 
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
 
 import java.time.LocalTime;
 import java.time.format.DateTimeFormatter;
@@ -37,7 +37,7 @@ public class ClockHud extends HudModule {
     private static final DateTimeFormatter FORMAT_24 = DateTimeFormatter.ofPattern("HH:mm");
     private static final DateTimeFormatter FORMAT_12 = DateTimeFormatter.ofPattern("h:mm a");
 
-    /** Minecraft ticks per in-game day. */
+    /** MinecraftClient ticks per in-game day. */
     private static final long TICKS_PER_DAY = 24000L;
 
     private final EnumSetting<Mode> mode;
@@ -59,30 +59,30 @@ public class ClockHud extends HudModule {
     /**
      * In-game time of day as a 24-hour clock.
      *
-     * <p>Minecraft's tick 0 is 06:00, so the offset is folded in before converting.
+     * <p>MinecraftClient's tick 0 is 06:00, so the offset is folded in before converting.
      */
     private String inGameTime() {
-        if (Mc.client() == null || Mc.client().level == null) {
+        if (Mc.client() == null || Mc.client().world == null) {
             return "--:--";
         }
-        long timeOfDay = Math.floorMod(Mc.client().level.getDefaultClockTime() + 6000L, TICKS_PER_DAY);
+        long timeOfDay = Math.floorMod(Mc.client().world.getTimeOfDay() + 6000L, TICKS_PER_DAY);
         long hours = timeOfDay / 1000L;
         long minutes = (timeOfDay % 1000L) * 60L / 1000L;
         return String.format("%02d:%02d", hours, minutes);
     }
 
     @Override
-    public double contentWidth(Font font) {
-        return font.width(text());
+    public double contentWidth(TextRenderer font) {
+        return font.getWidth(text());
     }
 
     @Override
-    public double contentHeight(Font font) {
-        return font.lineHeight;
+    public double contentHeight(TextRenderer font) {
+        return font.fontHeight;
     }
 
     @Override
-    protected void renderContent(GuiGraphicsExtractor gfx, Font font) {
+    protected void renderContent(DrawContext gfx, TextRenderer font) {
         line(gfx, font, text(), 0, 0, Theme.textPrimary());
     }
 }

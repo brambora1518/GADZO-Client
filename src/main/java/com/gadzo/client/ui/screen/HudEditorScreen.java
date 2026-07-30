@@ -9,11 +9,9 @@ import com.gadzo.client.ui.Theme;
 import com.gadzo.client.util.ColorUtil;
 import com.gadzo.client.util.MathUtil;
 
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.network.chat.Component;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.text.Text;
 
 import org.lwjgl.glfw.GLFW;
 
@@ -45,7 +43,7 @@ public class HudEditorScreen extends Screen {
     private final List<Double> horizontalGuides = new ArrayList<>();
 
     public HudEditorScreen() {
-        super(Component.literal("HUD Editor"));
+        super(Text.literal("HUD Editor"));
     }
 
     @Override
@@ -54,7 +52,7 @@ public class HudEditorScreen extends Screen {
     }
 
     @Override
-    public boolean isPauseScreen() {
+    public boolean shouldPause() {
         return false;
     }
 
@@ -76,8 +74,7 @@ public class HudEditorScreen extends Screen {
      * <p>See {@code ClickGuiScreen.extractBackground}: vanilla's default background requests
      * a blur too, and only one is permitted per frame.
      */
-    @Override
-    public void extractBackground(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
+    private void drawBackdrop(DrawContext gfx) {
         if (Theme.blurEnabled()) {
             Render2D.blurBehind(gfx);
         }
@@ -85,11 +82,12 @@ public class HudEditorScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
+    public void render(DrawContext gfx, int mouseX, int mouseY, float partialTick) {
+        drawBackdrop(gfx);
         drawCenterLines(gfx);
 
         for (HudModule module : editableElements()) {
-            module.render(gfx, font, width, height, 1.0);
+            module.render(gfx, textRenderer, width, height, 1.0);
             drawOutline(gfx, module, mouseX, mouseY);
         }
 
@@ -97,13 +95,13 @@ public class HudEditorScreen extends Screen {
         drawHelpBar(gfx);
     }
 
-    private void drawCenterLines(GuiGraphicsExtractor gfx) {
+    private void drawCenterLines(DrawContext gfx) {
         int subtle = ColorUtil.withAlpha(Theme.textMuted(), 40);
         Render2D.rect(gfx, width / 2.0, 0, 1, height, subtle);
         Render2D.rect(gfx, 0, height / 2.0, width, 1, subtle);
     }
 
-    private void drawOutline(GuiGraphicsExtractor gfx, HudModule module, int mouseX, int mouseY) {
+    private void drawOutline(DrawContext gfx, HudModule module, int mouseX, int mouseY) {
         double x = module.lastX();
         double y = module.lastY();
         double w = module.lastWidth();
@@ -118,18 +116,18 @@ public class HudEditorScreen extends Screen {
         if (hovered || active) {
             // Floating label so the player can tell overlapping elements apart.
             String label = module.getName();
-            double labelWidth = font.width(label) + 8;
-            double labelY = y - font.lineHeight - 4;
+            double labelWidth = textRenderer.getWidth(label) + 8;
+            double labelY = y - textRenderer.fontHeight - 4;
             if (labelY < 0) {
                 labelY = y + h + 3;
             }
-            Render2D.roundedRect(gfx, x - 1, labelY, labelWidth, font.lineHeight + 2,
+            Render2D.roundedRect(gfx, x - 1, labelY, labelWidth, textRenderer.fontHeight + 2,
                     Theme.radiusSmall(), ColorUtil.withAlpha(Theme.surface(), 235));
-            Render2D.text(gfx, font, label, x + 3, labelY + 2, Theme.textPrimary());
+            Render2D.text(gfx, textRenderer, label, x + 3, labelY + 2, Theme.textPrimary());
         }
     }
 
-    private void drawGuides(GuiGraphicsExtractor gfx) {
+    private void drawGuides(DrawContext gfx) {
         int color = Theme.accent();
         for (double x : verticalGuides) {
             Render2D.rect(gfx, x, 0, 1, height, ColorUtil.withAlpha(color, 190));
@@ -139,16 +137,16 @@ public class HudEditorScreen extends Screen {
         }
     }
 
-    private void drawHelpBar(GuiGraphicsExtractor gfx) {
+    private void drawHelpBar(DrawContext gfx) {
         String help = "Drag to move  ·  arrows nudge  ·  R resets selected  ·  Esc saves and exits";
-        double barWidth = font.width(help) + 20;
+        double barWidth = textRenderer.getWidth(help) + 20;
         double x = (width - barWidth) / 2.0;
         double y = height - 26;
 
         Render2D.shadow(gfx, x, y, barWidth, 18, Theme.radiusSmall(), 4, Theme.shadowColor());
         Render2D.roundedRect(gfx, x, y, barWidth, 18, Theme.radiusSmall(),
                 ColorUtil.withAlpha(Theme.surface(), 240));
-        Render2D.textCentered(gfx, font, help, width / 2.0, y + 5, Theme.textSecondary(), false);
+        Render2D.textCentered(gfx, textRenderer, help, width / 2.0, y + 5, Theme.textSecondary(), false);
     }
 
     // -- snapping ------------------------------------------------------------------------------
@@ -167,8 +165,8 @@ public class HudEditorScreen extends Screen {
         verticalGuides.clear();
         horizontalGuides.clear();
 
-        double w = moving.totalWidth(font);
-        double h = moving.totalHeight(font);
+        double w = moving.totalWidth(textRenderer);
+        double h = moving.totalHeight(textRenderer);
 
         List<Double> xCandidates = new ArrayList<>(List.of(0.0, width / 2.0, (double) width));
         List<Double> yCandidates = new ArrayList<>(List.of(0.0, height / 2.0, (double) height));
@@ -222,9 +220,9 @@ public class HudEditorScreen extends Screen {
     // -- input ---------------------------------------------------------------------------------
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        double mouseX = event.x();
-        double mouseY = event.y();
+    public boolean mouseClicked(double clickX, double clickY, int button) {
+        double mouseX = clickX;
+        double mouseY = clickY;
 
         // Iterate in reverse so the element drawn last (on top) is grabbed first.
         List<HudModule> elements = editableElements();
@@ -237,50 +235,50 @@ public class HudEditorScreen extends Screen {
                 return true;
             }
         }
-        return super.mouseClicked(event, doubleClick);
+        return super.mouseClicked(clickX, clickY, button);
     }
 
     @Override
-    public boolean mouseDragged(MouseButtonEvent event, double deltaX, double deltaY) {
+    public boolean mouseDragged(double clickX, double clickY, int button, double deltaX, double deltaY) {
         if (dragged == null) {
-            return super.mouseDragged(event, deltaX, deltaY);
+            return super.mouseDragged(clickX, clickY, button, deltaX, deltaY);
         }
 
-        double proposedX = event.x() - grabOffsetX;
-        double proposedY = event.y() - grabOffsetY;
+        double proposedX = clickX - grabOffsetX;
+        double proposedY = clickY - grabOffsetY;
 
         double[] snapped = applySnapping(dragged, proposedX, proposedY);
 
         // Keep the element on screen regardless of where the cursor went.
-        double w = dragged.totalWidth(font);
-        double h = dragged.totalHeight(font);
+        double w = dragged.totalWidth(textRenderer);
+        double h = dragged.totalHeight(textRenderer);
         double x = MathUtil.clamp(snapped[0], 0, Math.max(0, width - w));
         double y = MathUtil.clamp(snapped[1], 0, Math.max(0, height - h));
 
-        dragged.moveTopLeftTo(font, x, y, width, height);
+        dragged.moveTopLeftTo(textRenderer, x, y, width, height);
         return true;
     }
 
     @Override
-    public boolean mouseReleased(MouseButtonEvent event) {
+    public boolean mouseReleased(double clickX, double clickY, int button) {
         if (dragged != null) {
             // Re-anchor now the final position is known, so the element keeps sensible
             // behaviour if the window is later resized.
-            dragged.reanchor(font, width, height);
+            dragged.reanchor(textRenderer, width, height);
             dragged = null;
             verticalGuides.clear();
             horizontalGuides.clear();
             return true;
         }
-        return super.mouseReleased(event);
+        return super.mouseReleased(clickX, clickY, button);
     }
 
     @Override
-    public boolean keyPressed(KeyEvent event) {
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         HudModule target = dragged != null ? dragged : hoveredElement();
         if (target != null) {
-            int step = minecraft != null && minecraft.hasShiftDown() ? 10 : 1;
-            switch (event.key()) {
+            int step = hasShiftDown() ? 10 : 1;
+            switch (keyCode) {
                 case GLFW.GLFW_KEY_LEFT -> {
                     nudge(target, -step, 0);
                     return true;
@@ -306,16 +304,19 @@ public class HudEditorScreen extends Screen {
                 }
             }
         }
-        return super.keyPressed(event);
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     /** The element under the cursor, used so arrow keys work without holding a drag. */
     private HudModule hoveredElement() {
-        if (minecraft == null) {
+        if (client == null) {
             return null;
         }
-        double mouseX = minecraft.mouseHandler.getScaledXPos(minecraft.getWindow());
-        double mouseY = minecraft.mouseHandler.getScaledYPos(minecraft.getWindow());
+        // 1.20.1 has no scaled-cursor helper, so convert from window to GUI coordinates.
+        double scaleX = client.getWindow().getScaledWidth() / (double) client.getWindow().getWidth();
+        double scaleY = client.getWindow().getScaledHeight() / (double) client.getWindow().getHeight();
+        double mouseX = client.mouse.getX() * scaleX;
+        double mouseY = client.mouse.getY() * scaleY;
 
         List<HudModule> elements = editableElements();
         for (int i = elements.size() - 1; i >= 0; i--) {

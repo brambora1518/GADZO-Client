@@ -17,15 +17,12 @@ public class WeatherRender extends Module {
     private static WeatherRender instance;
 
     private final BooleanSetting hideRain;
-    private final BooleanSetting hideStars;
 
     public WeatherRender() {
-        super("Weather render", "Skip drawing rain, snow and stars", ModuleCategory.PERFORMANCE);
+        super("Weather render", "Skip drawing rain and snow", ModuleCategory.PERFORMANCE);
         instance = this;
         this.hideRain = addBool("Hide rain and snow", true,
                 "Stop drawing precipitation; the weather itself is unaffected");
-        this.hideStars = addBool("Hide sun, moon and stars", false,
-                "Skip the celestial bodies as well");
     }
 
     public static WeatherRender get() {
@@ -37,8 +34,4 @@ public class WeatherRender extends Module {
         return isEnabled() && hideRain.get();
     }
 
-    /** Consulted by the sky renderer mixin. */
-    public boolean shouldSkipCelestials() {
-        return isEnabled() && hideStars.get();
-    }
 }

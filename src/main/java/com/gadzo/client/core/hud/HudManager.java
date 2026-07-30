@@ -2,20 +2,23 @@ package com.gadzo.client.core.hud;
 
 import com.gadzo.client.GadzoClient;
 
-import net.fabricmc.fabric.api.client.rendering.v1.hud.HudElementRegistry;
-import net.minecraft.client.DeltaTracker;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.fabricmc.fabric.api.client.rendering.v1.HudRenderCallback;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.gui.DrawContext;
 
 /**
  * Draws every enabled HUD element each frame.
  *
- * <p>Registered as a single Fabric HUD element rather than one per module: the ordering
- * between GADZO readouts is then ours to control, and vanilla only sees one entry to sort.
+ * <p>Registered as a single {@link HudRenderCallback} rather than one per module, so the
+ * ordering between GADZO readouts is ours to control.
+ *
+ * <p>Unlike the 26.2 branch — where Fabric's HUD element registry sits inside vanilla's own
+ * gated HUD pass — this callback fires regardless of whether the GUI is hidden, so the F1
+ * check has to be made here.
  */
 public final class HudManager {
 
-    /** Set by the HUD editor so live elements dim while the editor overlay is open. */
+    /** Set by the HUD editor so live elements are suppressed while the editor is open. */
     private static boolean editorOpen;
 
     private HudManager() {
@@ -30,31 +33,28 @@ public final class HudManager {
     }
 
     public static void register() {
-        HudElementRegistry.addLast(GadzoClient.id("hud"), HudManager::renderAll);
+        HudRenderCallback.EVENT.register(HudManager::renderAll);
     }
 
-    private static void renderAll(GuiGraphicsExtractor gfx, DeltaTracker delta) {
-        Minecraft client = Minecraft.getInstance();
-        if (client == null || client.player == null) {
+    private static void renderAll(DrawContext context, float tickDelta) {
+        MinecraftClient client = MinecraftClient.getInstance();
+        if (client == null || client.player == null || client.options.hudHidden) {
             return;
         }
-        // No F1 check needed: this element is registered inside vanilla's HUD pass, which
-        // vanilla already skips when the GUI is hidden.
-        // The editor draws its own copy of every element on top of a dimmed backdrop, so
-        // suppress the live pass to avoid double-drawing.
+        // The editor draws its own copy of every element over a dimmed backdrop.
         if (editorOpen) {
             return;
         }
 
-        int width = client.getWindow().getGuiScaledWidth();
-        int height = client.getWindow().getGuiScaledHeight();
+        int width = client.getWindow().getScaledWidth();
+        int height = client.getWindow().getScaledHeight();
 
         for (HudModule module : GadzoClient.modules().hudModules()) {
             if (!module.isEnabled()) {
                 continue;
             }
             try {
-                module.render(gfx, client.font, width, height, 1.0);
+                module.render(context, client.textRenderer, width, height, 1.0);
             } catch (Exception e) {
                 GadzoClient.LOGGER.error("HUD element '{}' failed to render and was disabled",
                         module.getId(), e);

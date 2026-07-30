@@ -9,11 +9,11 @@ import com.gadzo.client.ui.Theme;
 import com.gadzo.client.util.Animation;
 import com.gadzo.client.util.ColorUtil;
 
-import net.minecraft.client.KeyMapping;
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.Options;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.option.KeyBinding;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.option.GameOptions;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
 
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -98,30 +98,30 @@ public class KeystrokesHud extends HudModule {
         return cells;
     }
 
-    private static Options options() {
-        Minecraft client = Minecraft.getInstance();
+    private static GameOptions options() {
+        MinecraftClient client = MinecraftClient.getInstance();
         return client == null ? null : client.options;
     }
 
-    private static boolean isDown(Function<Options, KeyMapping> pick) {
-        Options options = options();
+    private static boolean isDown(Function<GameOptions, KeyBinding> pick) {
+        GameOptions options = options();
         if (options == null) {
             return false;
         }
-        KeyMapping mapping = pick.apply(options);
-        return mapping != null && mapping.isDown();
+        KeyBinding mapping = pick.apply(options);
+        return mapping != null && mapping.isPressed();
     }
 
     private boolean pressed(Slot slot) {
         return switch (slot) {
-            case W -> isDown(o -> o.keyUp);
-            case A -> isDown(o -> o.keyLeft);
-            case S -> isDown(o -> o.keyDown);
-            case D -> isDown(o -> o.keyRight);
-            case LMB -> isDown(o -> o.keyAttack);
-            case RMB -> isDown(o -> o.keyUse);
-            case SPACE -> isDown(o -> o.keyJump);
-            case SHIFT -> isDown(o -> o.keyShift);
+            case W -> isDown(o -> o.forwardKey);
+            case A -> isDown(o -> o.leftKey);
+            case S -> isDown(o -> o.backKey);
+            case D -> isDown(o -> o.rightKey);
+            case LMB -> isDown(o -> o.attackKey);
+            case RMB -> isDown(o -> o.useKey);
+            case SPACE -> isDown(o -> o.jumpKey);
+            case SHIFT -> isDown(o -> o.sneakKey);
         };
     }
 
@@ -136,12 +136,12 @@ public class KeystrokesHud extends HudModule {
     }
 
     @Override
-    public double contentWidth(Font font) {
+    public double contentWidth(TextRenderer font) {
         return GRID_WIDTH;
     }
 
     @Override
-    public double contentHeight(Font font) {
+    public double contentHeight(TextRenderer font) {
         List<Cell> cells = layout();
         double bottom = 0;
         for (Cell cell : cells) {
@@ -151,7 +151,7 @@ public class KeystrokesHud extends HudModule {
     }
 
     @Override
-    protected void renderContent(GuiGraphicsExtractor gfx, Font font) {
+    protected void renderContent(DrawContext gfx, TextRenderer font) {
         int index = 0;
         for (Cell cell : layout()) {
             Animation animation = animations.get(cell.slot());
@@ -170,7 +170,7 @@ public class KeystrokesHud extends HudModule {
                     Theme.radiusSmall(), background);
             Render2D.textCentered(gfx, font, label(cell.slot()),
                     cell.x() + cell.width() / 2.0,
-                    cell.y() + (cell.height() - font.lineHeight) / 2.0 + 1,
+                    cell.y() + (cell.height() - font.fontHeight) / 2.0 + 1,
                     textColor, hasTextShadow());
             index++;
         }

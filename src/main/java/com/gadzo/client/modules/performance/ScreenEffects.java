@@ -5,7 +5,7 @@ import com.gadzo.client.core.module.ModuleCategory;
 import com.gadzo.client.core.setting.NumberSetting;
 import com.gadzo.client.util.Mc;
 
-import net.minecraft.client.Options;
+import net.minecraft.client.option.GameOptions;
 
 /**
  * Scales down the full-screen distortion effects.
@@ -49,14 +49,14 @@ public class ScreenEffects extends Module {
     }
 
     private void apply() {
-        Options options = Mc.client() == null ? null : Mc.client().options;
+        GameOptions options = Mc.client() == null ? null : Mc.client().options;
         if (options == null) {
             return;
         }
-        options.screenEffectScale().set(distortion.get() / 100.0);
-        options.fovEffectScale().set(fovEffect.get() / 100.0);
-        options.darknessEffectScale().set(darkness.get() / 100.0);
-        options.glintSpeed().set(glintSpeed.get() / 100.0);
+        options.getDistortionEffectScale().setValue(distortion.get() / 100.0);
+        options.getFovEffectScale().setValue(fovEffect.get() / 100.0);
+        options.getDarknessEffectScale().setValue(darkness.get() / 100.0);
+        options.getGlintSpeed().setValue(glintSpeed.get() / 100.0);
     }
 
     @Override
@@ -68,13 +68,13 @@ public class ScreenEffects extends Module {
     protected void onDisable() {
         // Restore vanilla defaults rather than whatever the player had, since these sliders
         // are almost always left at full and re-reading them adds state for no benefit.
-        Options options = Mc.client() == null ? null : Mc.client().options;
+        GameOptions options = Mc.client() == null ? null : Mc.client().options;
         if (options == null) {
             return;
         }
-        options.screenEffectScale().set(1.0);
-        options.fovEffectScale().set(1.0);
-        options.darknessEffectScale().set(1.0);
-        options.glintSpeed().set(0.5);
+        options.getDistortionEffectScale().setValue(1.0);
+        options.getFovEffectScale().setValue(1.0);
+        options.getDarknessEffectScale().setValue(1.0);
+        options.getGlintSpeed().setValue(0.5);
     }
 }

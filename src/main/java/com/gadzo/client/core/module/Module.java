@@ -8,7 +8,7 @@ import com.gadzo.client.core.setting.NumberSetting;
 import com.gadzo.client.core.setting.Setting;
 import com.gadzo.client.util.Animation;
 
-import net.minecraft.client.Minecraft;
+import net.minecraft.client.MinecraftClient;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -30,11 +30,11 @@ public abstract class Module {
      * The game instance.
      *
      * <p>Resolved per call rather than cached in a static field: Fabric runs client
-     * entrypoints from inside the {@code Minecraft} constructor, so a field initialised at
+     * entrypoints from inside the {@code MinecraftClient} constructor, so a field initialised at
      * class-load time can capture {@code null}.
      */
-    protected static Minecraft mc() {
-        return Minecraft.getInstance();
+    protected static MinecraftClient mc() {
+        return MinecraftClient.getInstance();
     }
 
     private final String name;
@@ -226,8 +226,8 @@ public abstract class Module {
 
     /** True when the player is in a world and able to act. */
     protected boolean inGame() {
-        Minecraft client = mc();
-        return client != null && client.player != null && client.level != null;
+        MinecraftClient client = mc();
+        return client != null && client.player != null && client.world != null;
     }
 
     // -- setting registration -------------------------------------------------------

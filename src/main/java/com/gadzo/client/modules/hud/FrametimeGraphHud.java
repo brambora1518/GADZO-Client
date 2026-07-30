@@ -10,8 +10,8 @@ import com.gadzo.client.ui.Theme;
 import com.gadzo.client.util.ColorUtil;
 import com.gadzo.client.util.MathUtil;
 
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
 
 /**
  * Rolling frame-time graph.
@@ -120,17 +120,17 @@ public class FrametimeGraphHud extends HudModule {
     }
 
     @Override
-    public double contentWidth(Font font) {
+    public double contentWidth(TextRenderer font) {
         return graphWidth.get();
     }
 
     @Override
-    public double contentHeight(Font font) {
-        return graphHeight.get() + (showLows.get() ? font.lineHeight + 2 : 0);
+    public double contentHeight(TextRenderer font) {
+        return graphHeight.get() + (showLows.get() ? font.fontHeight + 2 : 0);
     }
 
     @Override
-    protected void renderContent(GuiGraphicsExtractor gfx, Font font) {
+    protected void renderContent(DrawContext gfx, TextRenderer font) {
         sample();
 
         double width = graphWidth.get();

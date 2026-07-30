@@ -1,16 +1,16 @@
 package com.gadzo.client.util;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.multiplayer.PlayerInfo;
-import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.client.network.PlayerListEntry;
+import net.minecraft.client.network.ClientPlayerEntity;
 
 /**
  * Thin accessors for the pieces of the game the client touches most.
  *
- * <p>Minecraft 26 moved a few of these behind new owners — the active screen now lives on
- * {@code Gui} rather than on {@code Minecraft}, for instance. Funnelling access through here
+ * <p>MinecraftClient 26 moved a few of these behind new owners — the active screen now lives on
+ * {@code Gui} rather than on {@code MinecraftClient}, for instance. Funnelling access through here
  * keeps that knowledge in one file instead of scattered across every screen and HUD element.
  */
 public final class Mc {
@@ -18,30 +18,30 @@ public final class Mc {
     private Mc() {
     }
 
-    public static Minecraft client() {
-        return Minecraft.getInstance();
+    public static MinecraftClient client() {
+        return MinecraftClient.getInstance();
     }
 
-    public static LocalPlayer player() {
-        Minecraft client = client();
+    public static ClientPlayerEntity player() {
+        MinecraftClient client = client();
         return client == null ? null : client.player;
     }
 
-    public static Font font() {
-        Minecraft client = client();
-        return client == null ? null : client.font;
+    public static TextRenderer font() {
+        MinecraftClient client = client();
+        return client == null ? null : client.textRenderer;
     }
 
     /** The screen currently open, or {@code null} when the player has none. */
     public static Screen screen() {
-        Minecraft client = client();
-        return client == null || client.gui == null ? null : client.gui.screen();
+        MinecraftClient client = client();
+        return client == null ? null : client.currentScreen;
     }
 
     public static void openScreen(Screen screen) {
-        Minecraft client = client();
+        MinecraftClient client = client();
         if (client != null) {
-            client.setScreenAndShow(screen);
+            client.setScreen(screen);
         }
     }
 
@@ -50,27 +50,27 @@ public final class Mc {
     }
 
     public static boolean inGame() {
-        Minecraft client = client();
-        return client != null && client.player != null && client.level != null;
+        MinecraftClient client = client();
+        return client != null && client.player != null && client.world != null;
     }
 
     public static int guiWidth() {
-        Minecraft client = client();
-        return client == null ? 0 : client.getWindow().getGuiScaledWidth();
+        MinecraftClient client = client();
+        return client == null ? 0 : client.getWindow().getScaledWidth();
     }
 
     public static int guiHeight() {
-        Minecraft client = client();
-        return client == null ? 0 : client.getWindow().getGuiScaledHeight();
+        MinecraftClient client = client();
+        return client == null ? 0 : client.getWindow().getScaledHeight();
     }
 
     /** Round-trip latency to the current server, or 0 when it is not known. */
     public static int ping() {
-        Minecraft client = client();
-        if (client == null || client.player == null || client.getConnection() == null) {
+        MinecraftClient client = client();
+        if (client == null || client.player == null || client.getNetworkHandler() == null) {
             return 0;
         }
-        PlayerInfo info = client.getConnection().getPlayerInfo(client.player.getUUID());
+        PlayerListEntry info = client.getNetworkHandler().getPlayerListEntry(client.player.getUuid());
         return info == null ? 0 : Math.max(0, info.getLatency());
     }
 

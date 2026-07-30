@@ -6,9 +6,9 @@ import com.gadzo.client.core.setting.BooleanSetting;
 import com.gadzo.client.ui.Theme;
 import com.gadzo.client.util.Mc;
 
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.network.ClientPlayerEntity;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -27,14 +27,14 @@ public class ToggleSprintHud extends HudModule {
 
     private List<String> lines() {
         List<String> lines = new ArrayList<>(3);
-        LocalPlayer player = Mc.player();
+        ClientPlayerEntity player = Mc.player();
         if (player == null) {
             return lines;
         }
         if (player.isSprinting()) {
             lines.add("Sprinting");
         }
-        if (showSneak.get() && player.isCrouching()) {
+        if (showSneak.get() && player.isSneaking()) {
             lines.add("Sneaking");
         }
         if (showFly.get() && player.getAbilities().flying) {
@@ -44,26 +44,26 @@ public class ToggleSprintHud extends HudModule {
     }
 
     @Override
-    public double contentWidth(Font font) {
+    public double contentWidth(TextRenderer font) {
         double widest = 0;
         for (String line : lines()) {
-            widest = Math.max(widest, font.width(line));
+            widest = Math.max(widest, font.getWidth(line));
         }
         // Reserve the widest possible label so the plate does not resize as state changes.
-        return Math.max(widest, font.width("Sprinting"));
+        return Math.max(widest, font.getWidth("Sprinting"));
     }
 
     @Override
-    public double contentHeight(Font font) {
-        return Math.max(1, lines().size()) * font.lineHeight;
+    public double contentHeight(TextRenderer font) {
+        return Math.max(1, lines().size()) * font.fontHeight;
     }
 
     @Override
-    protected void renderContent(GuiGraphicsExtractor gfx, Font font) {
+    protected void renderContent(DrawContext gfx, TextRenderer font) {
         double y = 0;
         for (String text : lines()) {
             line(gfx, font, text, 0, y, Theme.accent());
-            y += font.lineHeight;
+            y += font.fontHeight;
         }
     }
 }

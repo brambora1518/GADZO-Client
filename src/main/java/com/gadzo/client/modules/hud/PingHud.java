@@ -6,8 +6,8 @@ import com.gadzo.client.core.setting.BooleanSetting;
 import com.gadzo.client.ui.Theme;
 import com.gadzo.client.util.Mc;
 
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
 
 /** Latency to the current server, colour-coded by quality. */
 public class PingHud extends HudModule {
@@ -20,7 +20,7 @@ public class PingHud extends HudModule {
     }
 
     private String text() {
-        if (Mc.client() != null && Mc.client().getConnection() == null) {
+        if (Mc.client() != null && Mc.client().getNetworkHandler() == null) {
             return "-- ms";
         }
         return Mc.ping() + " ms";
@@ -38,17 +38,17 @@ public class PingHud extends HudModule {
     }
 
     @Override
-    public double contentWidth(Font font) {
-        return font.width(text());
+    public double contentWidth(TextRenderer font) {
+        return font.getWidth(text());
     }
 
     @Override
-    public double contentHeight(Font font) {
-        return font.lineHeight;
+    public double contentHeight(TextRenderer font) {
+        return font.fontHeight;
     }
 
     @Override
-    protected void renderContent(GuiGraphicsExtractor gfx, Font font) {
+    protected void renderContent(DrawContext gfx, TextRenderer font) {
         line(gfx, font, text(), 0, 0, color());
     }
 }

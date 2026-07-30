@@ -6,8 +6,8 @@ import com.gadzo.client.core.setting.BooleanSetting;
 import com.gadzo.client.core.setting.NumberSetting;
 import com.gadzo.client.util.Mc;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.Options;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.option.GameOptions;
 
 /**
  * Throttles the frame rate when the client does not need a fast one.
@@ -51,9 +51,9 @@ public class DynamicFps extends Module {
 
     @Override
     protected void onEnable() {
-        Options options = options();
+        GameOptions options = options();
         if (options != null) {
-            savedLimit = options.framerateLimit().get();
+            savedLimit = options.getMaxFps().getValue();
         }
     }
 
@@ -62,34 +62,34 @@ public class DynamicFps extends Module {
         restore();
     }
 
-    private static Options options() {
-        Minecraft client = Minecraft.getInstance();
+    private static GameOptions options() {
+        MinecraftClient client = MinecraftClient.getInstance();
         return client == null ? null : client.options;
     }
 
     private void restore() {
-        Options options = options();
+        GameOptions options = options();
         if (options != null && savedLimit != NOT_CAPTURED) {
-            options.framerateLimit().set(savedLimit);
+            options.getMaxFps().setValue(savedLimit);
         }
         appliedLimit = NOT_CAPTURED;
     }
 
     @Override
     public void onTick() {
-        Minecraft client = Minecraft.getInstance();
-        Options options = options();
+        MinecraftClient client = MinecraftClient.getInstance();
+        GameOptions options = options();
         if (client == null || options == null) {
             return;
         }
 
         // Capture lazily in case the module was enabled before options were ready.
         if (savedLimit == NOT_CAPTURED) {
-            savedLimit = options.framerateLimit().get();
+            savedLimit = options.getMaxFps().getValue();
         }
 
         int desired;
-        if (!client.isWindowActive()) {
+        if (!client.isWindowFocused()) {
             desired = unfocusedLimit.getInt();
         } else if (throttleInMenus.get() && Mc.screen() != null) {
             desired = menuLimit.getInt();
@@ -98,7 +98,7 @@ public class DynamicFps extends Module {
         }
 
         if (desired != appliedLimit) {
-            options.framerateLimit().set(desired);
+            options.getMaxFps().setValue(desired);
             appliedLimit = desired;
         }
     }

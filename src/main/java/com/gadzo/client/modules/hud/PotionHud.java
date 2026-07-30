@@ -6,11 +6,11 @@ import com.gadzo.client.core.setting.BooleanSetting;
 import com.gadzo.client.ui.Theme;
 import com.gadzo.client.util.Mc;
 
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.world.effect.MobEffectCategory;
-import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.entity.effect.StatusEffectCategory;
+import net.minecraft.entity.effect.StatusEffectInstance;
 
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -41,24 +41,24 @@ public class PotionHud extends HudModule {
         this.hideAmbient = addBool("Hide beacon effects", false, "Skip ambient (beacon) effects");
     }
 
-    private List<MobEffectInstance> effects() {
-        List<MobEffectInstance> result = new ArrayList<>();
-        LocalPlayer player = Mc.player();
+    private List<StatusEffectInstance> effects() {
+        List<StatusEffectInstance> result = new ArrayList<>();
+        ClientPlayerEntity player = Mc.player();
         if (player == null) {
             return result;
         }
-        for (MobEffectInstance effect : player.getActiveEffects()) {
+        for (StatusEffectInstance effect : player.getStatusEffects()) {
             if (hideAmbient.get() && effect.isAmbient()) {
                 continue;
             }
             result.add(effect);
         }
-        result.sort(Comparator.comparingInt(MobEffectInstance::getDuration));
+        result.sort(Comparator.comparingInt(StatusEffectInstance::getDuration));
         return result;
     }
 
-    private String label(MobEffectInstance effect) {
-        StringBuilder text = new StringBuilder(effect.getEffect().value().getDisplayName().getString());
+    private String label(StatusEffectInstance effect) {
+        StringBuilder text = new StringBuilder(effect.getEffectType().getName().getString());
         if (showAmplifier.get() && effect.getAmplifier() > 0) {
             text.append(' ').append(roman(effect.getAmplifier() + 1));
         }
@@ -66,8 +66,8 @@ public class PotionHud extends HudModule {
         return text.toString();
     }
 
-    private static String duration(MobEffectInstance effect) {
-        if (effect.isInfiniteDuration() || effect.getDuration() >= INFINITE_DURATION) {
+    private static String duration(StatusEffectInstance effect) {
+        if (effect.isInfinite() || effect.getDuration() >= INFINITE_DURATION) {
             return "**:**";
         }
         int seconds = effect.getDuration() / TPS;
@@ -91,11 +91,11 @@ public class PotionHud extends HudModule {
         };
     }
 
-    private int color(MobEffectInstance effect) {
+    private int color(StatusEffectInstance effect) {
         if (!colorByType.get()) {
             return Theme.textPrimary();
         }
-        MobEffectCategory category = effect.getEffect().value().getCategory();
+        StatusEffectCategory category = effect.getEffectType().getCategory();
         return switch (category) {
             case BENEFICIAL -> Theme.success();
             case HARMFUL -> Theme.danger();
@@ -104,25 +104,25 @@ public class PotionHud extends HudModule {
     }
 
     @Override
-    public double contentWidth(Font font) {
+    public double contentWidth(TextRenderer font) {
         double widest = 0;
-        for (MobEffectInstance effect : effects()) {
-            widest = Math.max(widest, font.width(label(effect)));
+        for (StatusEffectInstance effect : effects()) {
+            widest = Math.max(widest, font.getWidth(label(effect)));
         }
         return widest;
     }
 
     @Override
-    public double contentHeight(Font font) {
-        return Math.max(0, effects().size()) * font.lineHeight;
+    public double contentHeight(TextRenderer font) {
+        return Math.max(0, effects().size()) * font.fontHeight;
     }
 
     @Override
-    protected void renderContent(GuiGraphicsExtractor gfx, Font font) {
+    protected void renderContent(DrawContext gfx, TextRenderer font) {
         double y = 0;
-        for (MobEffectInstance effect : effects()) {
+        for (StatusEffectInstance effect : effects()) {
             line(gfx, font, label(effect), 0, y, color(effect));
-            y += font.lineHeight;
+            y += font.fontHeight;
         }
     }
 }

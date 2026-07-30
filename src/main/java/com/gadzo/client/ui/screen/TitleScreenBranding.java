@@ -7,8 +7,8 @@ import com.gadzo.client.ui.Theme;
 import com.gadzo.client.util.ColorUtil;
 
 import net.fabricmc.fabric.api.client.screen.v1.ScreenEvents;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.screens.TitleScreen;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.TitleScreen;
 
 /**
  * GADZO branding on the vanilla title screen.
@@ -33,13 +33,13 @@ public final class TitleScreenBranding {
             if (!(screen instanceof TitleScreen)) {
                 return;
             }
-            ScreenEvents.afterExtract(screen).register(TitleScreenBranding::draw);
+            ScreenEvents.afterRender(screen).register(TitleScreenBranding::draw);
         });
     }
 
-    private static void draw(net.minecraft.client.gui.screens.Screen screen, GuiGraphicsExtractor gfx,
+    private static void draw(net.minecraft.client.gui.screen.Screen screen, DrawContext gfx,
                              int mouseX, int mouseY, float partialTick) {
-        var font = net.minecraft.client.Minecraft.getInstance().font;
+        var font = net.minecraft.client.MinecraftClient.getInstance().textRenderer;
         double x = MARGIN;
         double y = screen.height - PANEL_HEIGHT - MARGIN;
 
@@ -54,9 +54,9 @@ public final class TitleScreenBranding {
 
         double textX = x + 11;
         Render2D.text(gfx, font, "GADZO", textX, y + 7, Theme.accent());
-        Render2D.text(gfx, font, "CLIENT", textX + font.width("GADZO") + 4, y + 7, Theme.textMuted());
+        Render2D.text(gfx, font, "CLIENT", textX + font.getWidth("GADZO") + 4, y + 7, Theme.textMuted());
 
-        Render2D.text(gfx, font, "v" + GadzoClient.VERSION + "  ·  Minecraft 26.2",
+        Render2D.text(gfx, font, "v" + GadzoClient.VERSION + "  ·  MinecraftClient 26.2",
                 textX, y + 19, Theme.textSecondary());
 
         // Tier is only meaningful once the CPU benchmark has landed; before that it would

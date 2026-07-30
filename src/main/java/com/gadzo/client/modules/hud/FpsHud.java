@@ -7,8 +7,8 @@ import com.gadzo.client.core.setting.EnumSetting;
 import com.gadzo.client.ui.Theme;
 import com.gadzo.client.util.Mc;
 
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
 
 /** Frame-rate readout, optionally colour-coded by how healthy the frame rate is. */
 public class FpsHud extends HudModule {
@@ -41,7 +41,7 @@ public class FpsHud extends HudModule {
     }
 
     private String text() {
-        int fps = Mc.client() == null ? 0 : Mc.client().getFps();
+        int fps = Mc.client() == null ? 0 : Mc.client().getCurrentFps();
         return switch (style.get()) {
             case PLAIN -> Integer.toString(fps);
             case SUFFIX -> fps + " FPS";
@@ -53,7 +53,7 @@ public class FpsHud extends HudModule {
         if (!colorCode.get()) {
             return Theme.textPrimary();
         }
-        int fps = Mc.client() == null ? 0 : Mc.client().getFps();
+        int fps = Mc.client() == null ? 0 : Mc.client().getCurrentFps();
         if (fps >= 120) return Theme.success();
         if (fps >= 60) return Theme.textPrimary();
         if (fps >= 30) return Theme.warning();
@@ -61,17 +61,17 @@ public class FpsHud extends HudModule {
     }
 
     @Override
-    public double contentWidth(Font font) {
-        return font.width(text());
+    public double contentWidth(TextRenderer font) {
+        return font.getWidth(text());
     }
 
     @Override
-    public double contentHeight(Font font) {
-        return font.lineHeight;
+    public double contentHeight(TextRenderer font) {
+        return font.fontHeight;
     }
 
     @Override
-    protected void renderContent(GuiGraphicsExtractor gfx, Font font) {
+    protected void renderContent(DrawContext gfx, TextRenderer font) {
         line(gfx, font, text(), 0, 0, color());
     }
 }

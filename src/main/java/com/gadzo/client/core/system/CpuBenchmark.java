@@ -5,7 +5,7 @@ import com.gadzo.client.GadzoClient;
 /**
  * A short single-thread CPU benchmark.
  *
- * <p>Counting cores tells you very little about Minecraft performance: the game's render and
+ * <p>Counting cores tells you very little about MinecraftClient performance: the game's render and
  * tick loops are dominated by one thread, so an eight-thread part from 2012 and an
  * eight-thread part from today behave nothing alike. This measures what actually matters.
  *

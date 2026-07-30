@@ -12,11 +12,11 @@ import com.gadzo.client.util.ColorUtil;
 import com.gadzo.client.util.MathUtil;
 import com.gadzo.client.util.Mc;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.LivingEntity;
 
 /**
  * Information about the entity you are looking at or last attacked.
@@ -55,11 +55,11 @@ public class TargetHud extends HudModule {
 
     /** Updates the held target from the crosshair, if anything living is under it. */
     private void refreshTarget() {
-        Minecraft client = Mc.client();
+        MinecraftClient client = Mc.client();
         if (client == null) {
             return;
         }
-        Entity looked = client.crosshairPickEntity;
+        Entity looked = client.targetedEntity;
         if (looked instanceof LivingEntity living && living != client.player && living.isAlive()) {
             target = living;
             targetSeenAt = System.currentTimeMillis();
@@ -101,23 +101,23 @@ public class TargetHud extends HudModule {
     }
 
     @Override
-    public double contentWidth(Font font) {
+    public double contentWidth(TextRenderer font) {
         return visible() ? WIDTH : 0;
     }
 
     @Override
-    public double contentHeight(Font font) {
+    public double contentHeight(TextRenderer font) {
         return visible() ? PORTRAIT : 0;
     }
 
     @Override
-    protected void renderContent(GuiGraphicsExtractor gfx, Font font) {
+    protected void renderContent(DrawContext gfx, TextRenderer font) {
         refreshTarget();
         if (!visible()) {
             return;
         }
         if (target == null) {
-            Render2D.text(gfx, font, "No target", 0, (PORTRAIT - font.lineHeight) / 2.0,
+            Render2D.text(gfx, font, "No target", 0, (PORTRAIT - font.fontHeight) / 2.0,
                     Theme.textMuted());
             return;
         }
@@ -129,7 +129,7 @@ public class TargetHud extends HudModule {
         line(gfx, font, name, 0, 1, Theme.textPrimary());
 
         // Health bar.
-        double barY = font.lineHeight + 4;
+        double barY = font.fontHeight + 4;
         Render2D.roundedRect(gfx, 0, barY, WIDTH, BAR_HEIGHT, BAR_HEIGHT / 2.0,
                 ColorUtil.withAlpha(Theme.trackOff(), 190));
         double filled = WIDTH * healthBar.value();
@@ -143,7 +143,7 @@ public class TargetHud extends HudModule {
         line(gfx, font, health, 0, barY + BAR_HEIGHT + 2, Theme.textSecondary());
 
         if (showDistance.get() && Mc.player() != null) {
-            String distance = String.format("%.1f m", Math.sqrt(target.distanceToSqr(Mc.player())));
+            String distance = String.format("%.1f m", Math.sqrt(target.squaredDistanceTo(Mc.player())));
             Render2D.textRight(gfx, font, distance, WIDTH, barY + BAR_HEIGHT + 2,
                     Theme.textMuted(), hasTextShadow());
         }

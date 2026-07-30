@@ -8,12 +8,9 @@ import com.gadzo.client.util.ColorUtil;
 import com.gadzo.client.util.MathUtil;
 
 import net.fabricmc.loader.api.FabricLoader;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.gui.screens.Screen;
-import net.minecraft.client.input.CharacterEvent;
-import net.minecraft.client.input.KeyEvent;
-import net.minecraft.client.input.MouseButtonEvent;
-import net.minecraft.network.chat.Component;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.gui.screen.Screen;
+import net.minecraft.text.Text;
 
 import org.lwjgl.glfw.GLFW;
 
@@ -22,7 +19,7 @@ import java.util.List;
 /**
  * Reference and stress planner for the Create mod.
  *
- * <p>Create does not exist for Minecraft 26.2, so nothing here reads a live kinetic network —
+ * <p>Create does not exist for MinecraftClient 26.2, so nothing here reads a live kinetic network —
  * it is a planning tool. The last tab is the part that earns its place: a stress calculator,
  * which is otherwise a job people do in a spreadsheet.
  */
@@ -49,11 +46,11 @@ public class CreateHelperScreen extends Screen {
     private double windowY;
 
     public CreateHelperScreen() {
-        super(Component.literal("Create helper"));
+        super(Text.literal("Create helper"));
     }
 
     @Override
-    public boolean isPauseScreen() {
+    public boolean shouldPause() {
         return false;
     }
 
@@ -75,8 +72,7 @@ public class CreateHelperScreen extends Screen {
 
     // -- rendering ------------------------------------------------------------------------
 
-    @Override
-    public void extractBackground(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
+    private void drawBackdrop(DrawContext gfx) {
         if (Theme.blurEnabled()) {
             Render2D.blurBehind(gfx);
         }
@@ -84,7 +80,8 @@ public class CreateHelperScreen extends Screen {
     }
 
     @Override
-    public void extractRenderState(GuiGraphicsExtractor gfx, int mouseX, int mouseY, float partialTick) {
+    public void render(DrawContext gfx, int mouseX, int mouseY, float partialTick) {
+        drawBackdrop(gfx);
         windowX = (width - WINDOW_WIDTH) / 2.0;
         windowY = (height - WINDOW_HEIGHT) / 2.0;
 
@@ -104,12 +101,12 @@ public class CreateHelperScreen extends Screen {
         drawFooter(gfx);
     }
 
-    private void drawSidebar(GuiGraphicsExtractor gfx, int mouseX, int mouseY) {
+    private void drawSidebar(DrawContext gfx, int mouseX, int mouseY) {
         Render2D.roundedRect(gfx, windowX, windowY, SIDEBAR_WIDTH, WINDOW_HEIGHT,
                 Theme.radius(), 0, 0, Theme.radius(), Theme.surface());
 
-        Render2D.text(gfx, font, "CREATE", windowX + PADDING + 2, windowY + 16, Theme.accent());
-        Render2D.text(gfx, font, "HELPER", windowX + PADDING + 2 + font.width("CREATE") + 4,
+        Render2D.text(gfx, textRenderer, "CREATE", windowX + PADDING + 2, windowY + 16, Theme.accent());
+        Render2D.text(gfx, textRenderer, "HELPER", windowX + PADDING + 2 + textRenderer.getWidth("CREATE") + 4,
                 windowY + 16, Theme.textMuted());
 
         double y = windowY + HEADER_HEIGHT;
@@ -123,7 +120,7 @@ public class CreateHelperScreen extends Screen {
         drawSidebarItem(gfx, "Stress calculator", CALCULATOR_TAB, y, mouseX, mouseY);
     }
 
-    private void drawSidebarItem(GuiGraphicsExtractor gfx, String label, int index, double y,
+    private void drawSidebarItem(DrawContext gfx, String label, int index, double y,
                                  int mouseX, int mouseY) {
         boolean selected = selectedTopic == index;
         boolean hovered = MathUtil.within(mouseX, mouseY, windowX + 6, y,
@@ -136,12 +133,12 @@ public class CreateHelperScreen extends Screen {
         if (selected) {
             Render2D.roundedRect(gfx, windowX + 6, y + 6, 3, 14, 1.5, Theme.accent());
         }
-        Render2D.text(gfx, font, Render2D.truncate(font, label, (int) (SIDEBAR_WIDTH - 30)),
-                windowX + 18, y + (26 - font.lineHeight) / 2.0,
+        Render2D.text(gfx, textRenderer, Render2D.truncate(textRenderer, label, (int) (SIDEBAR_WIDTH - 30)),
+                windowX + 18, y + (26 - textRenderer.fontHeight) / 2.0,
                 selected ? Theme.textPrimary() : Theme.textSecondary());
     }
 
-    private void drawHeader(GuiGraphicsExtractor gfx) {
+    private void drawHeader(DrawContext gfx) {
         double x = contentX() + PADDING;
         double y = windowY + 13;
         double boxWidth = contentWidth() - PADDING * 2;
@@ -153,13 +150,13 @@ public class CreateHelperScreen extends Screen {
         String display = searchQuery.isEmpty() && !searchFocused
                 ? "Search the reference..."
                 : searchQuery + (searchFocused && (System.currentTimeMillis() / 500) % 2 == 0 ? "_" : "");
-        Render2D.text(gfx, font, display, x + 7, y + 6,
+        Render2D.text(gfx, textRenderer, display, x + 7, y + 6,
                 searchQuery.isEmpty() && !searchFocused ? Theme.textMuted() : Theme.textPrimary());
 
         Render2D.separator(gfx, contentX(), windowY + HEADER_HEIGHT - 1, contentWidth(), Theme.border());
     }
 
-    private void drawEntries(GuiGraphicsExtractor gfx) {
+    private void drawEntries(DrawContext gfx) {
         double x = contentX() + PADDING;
         double innerWidth = contentWidth() - PADDING * 2;
 
@@ -171,18 +168,18 @@ public class CreateHelperScreen extends Screen {
         double y = bodyTop() + 8 - scroll;
 
         if (entries.isEmpty()) {
-            Render2D.text(gfx, font, "Nothing matches that search.", x, y, Theme.textMuted());
+            Render2D.text(gfx, textRenderer, "Nothing matches that search.", x, y, Theme.textMuted());
         }
 
         for (CreateKnowledge.Entry entry : entries) {
-            Render2D.text(gfx, font, entry.title(), x, y, Theme.accent());
-            y += font.lineHeight + 4;
+            Render2D.text(gfx, textRenderer, entry.title(), x, y, Theme.accent());
+            y += textRenderer.fontHeight + 4;
 
             for (String paragraph : entry.body()) {
                 // Wrap by hand: the vanilla wrapper works on Components and this is plain text.
                 for (String wrapped : wrap(paragraph, (int) innerWidth)) {
-                    Render2D.text(gfx, font, wrapped, x, y, Theme.textSecondary());
-                    y += font.lineHeight + 1;
+                    Render2D.text(gfx, textRenderer, wrapped, x, y, Theme.textSecondary());
+                    y += textRenderer.fontHeight + 1;
                 }
                 y += 3;
             }
@@ -203,7 +200,7 @@ public class CreateHelperScreen extends Screen {
 
         for (String word : text.split(" ")) {
             String candidate = current.isEmpty() ? word : current + " " + word;
-            if (font.width(candidate) > maxWidth && !current.isEmpty()) {
+            if (textRenderer.getWidth(candidate) > maxWidth && !current.isEmpty()) {
                 lines.add(current.toString());
                 current = new StringBuilder(word);
             } else {
@@ -216,7 +213,7 @@ public class CreateHelperScreen extends Screen {
         return lines;
     }
 
-    private void drawCalculator(GuiGraphicsExtractor gfx, int mouseX, int mouseY) {
+    private void drawCalculator(DrawContext gfx, int mouseX, int mouseY) {
         double x = contentX() + PADDING;
         double innerWidth = contentWidth() - PADDING * 2;
         double listWidth = innerWidth * 0.52;
@@ -224,8 +221,8 @@ public class CreateHelperScreen extends Screen {
         Render2D.pushScissor(gfx, contentX(), bodyTop(), contentWidth(), bodyBottom() - bodyTop());
         double y = bodyTop() + 6 - scroll;
 
-        Render2D.text(gfx, font, "Click to add, right-click to remove", x, y, Theme.textMuted());
-        y += font.lineHeight + 6;
+        Render2D.text(gfx, textRenderer, "Click to add, right-click to remove", x, y, Theme.textMuted());
+        y += textRenderer.fontHeight + 6;
 
         for (StressCalculator.Machine machine : StressCalculator.MACHINES) {
             boolean hovered = MathUtil.within(mouseX, mouseY, x, y, x + listWidth, y + 15);
@@ -234,12 +231,12 @@ public class CreateHelperScreen extends Screen {
                         Theme.surfaceHover());
             }
             int count = countOf(machine);
-            Render2D.text(gfx, font, Render2D.truncate(font, machine.name(), (int) (listWidth - 54)),
+            Render2D.text(gfx, textRenderer, Render2D.truncate(textRenderer, machine.name(), (int) (listWidth - 54)),
                     x, y, count > 0 ? Theme.textPrimary() : Theme.textSecondary());
-            Render2D.textRight(gfx, font, machine.impact() + " /rpm", x + listWidth - 22, y,
+            Render2D.textRight(gfx, textRenderer, machine.impact() + " /rpm", x + listWidth - 22, y,
                     Theme.textMuted(), false);
             if (count > 0) {
-                Render2D.textRight(gfx, font, "x" + count, x + listWidth, y, Theme.accent(), false);
+                Render2D.textRight(gfx, textRenderer, "x" + count, x + listWidth, y, Theme.accent(), false);
             }
             y += 15;
         }
@@ -250,36 +247,36 @@ public class CreateHelperScreen extends Screen {
         double summaryWidth = innerWidth - listWidth - 14;
 
         double impact = calculator.totalImpact();
-        Render2D.text(gfx, font, "Plan", summaryX, summaryY, Theme.accent());
-        summaryY += font.lineHeight + 4;
-        Render2D.text(gfx, font, calculator.totalMachines() + " machines", summaryX, summaryY,
+        Render2D.text(gfx, textRenderer, "Plan", summaryX, summaryY, Theme.accent());
+        summaryY += textRenderer.fontHeight + 4;
+        Render2D.text(gfx, textRenderer, calculator.totalMachines() + " machines", summaryX, summaryY,
                 Theme.textSecondary());
-        summaryY += font.lineHeight + 1;
-        Render2D.text(gfx, font, String.format("%.0f su/rpm", impact), summaryX, summaryY,
+        summaryY += textRenderer.fontHeight + 1;
+        Render2D.text(gfx, textRenderer, String.format("%.0f su/rpm", impact), summaryX, summaryY,
                 Theme.textPrimary());
-        summaryY += font.lineHeight + 1;
-        Render2D.text(gfx, font, String.format("%.0f SU at 64 rpm", calculator.stressAtSpeed(64)),
+        summaryY += textRenderer.fontHeight + 1;
+        Render2D.text(gfx, textRenderer, String.format("%.0f SU at 64 rpm", calculator.stressAtSpeed(64)),
                 summaryX, summaryY, Theme.textMuted());
-        summaryY += font.lineHeight + 8;
+        summaryY += textRenderer.fontHeight + 8;
 
-        Render2D.text(gfx, font, "Generators needed", summaryX, summaryY, Theme.accent());
-        summaryY += font.lineHeight + 4;
+        Render2D.text(gfx, textRenderer, "Generators needed", summaryX, summaryY, Theme.accent());
+        summaryY += textRenderer.fontHeight + 4;
 
         for (StressCalculator.Generator generator : StressCalculator.GENERATORS) {
             int needed = calculator.generatorsNeeded(generator);
-            String label = Render2D.truncate(font, generator.name(), (int) (summaryWidth - 26));
-            Render2D.text(gfx, font, label, summaryX, summaryY, Theme.textSecondary());
-            Render2D.textRight(gfx, font, needed == 0 ? "-" : "x" + needed,
+            String label = Render2D.truncate(textRenderer, generator.name(), (int) (summaryWidth - 26));
+            Render2D.text(gfx, textRenderer, label, summaryX, summaryY, Theme.textSecondary());
+            Render2D.textRight(gfx, textRenderer, needed == 0 ? "-" : "x" + needed,
                     summaryX + summaryWidth, summaryY,
                     needed == 0 ? Theme.textMuted() : Theme.textPrimary(), false);
-            summaryY += font.lineHeight + 1;
+            summaryY += textRenderer.fontHeight + 1;
         }
 
         summaryY += 6;
         for (String wrapped : wrap("Speed does not buy headroom: impact and capacity both scale "
                 + "with RPM. Verify against goggles in game.", (int) summaryWidth)) {
-            Render2D.text(gfx, font, wrapped, summaryX, summaryY, Theme.textMuted());
-            summaryY += font.lineHeight;
+            Render2D.text(gfx, textRenderer, wrapped, summaryX, summaryY, Theme.textMuted());
+            summaryY += textRenderer.fontHeight;
         }
 
         Render2D.popScissor(gfx);
@@ -295,26 +292,26 @@ public class CreateHelperScreen extends Screen {
         return 0;
     }
 
-    private void drawFooter(GuiGraphicsExtractor gfx) {
+    private void drawFooter(DrawContext gfx) {
         double y = windowY + WINDOW_HEIGHT - FOOTER_HEIGHT;
         Render2D.separator(gfx, contentX(), y, contentWidth(), Theme.border());
 
         boolean createLoaded = FabricLoader.getInstance().isModLoaded("create");
         String status = createLoaded
                 ? "Create detected"
-                : "Reference only — Create has no build for Minecraft 26.2";
-        Render2D.text(gfx, font, status, contentX() + PADDING, y + 8,
+                : "Reference only — Create has no build for MinecraftClient 26.2";
+        Render2D.text(gfx, textRenderer, status, contentX() + PADDING, y + 8,
                 createLoaded ? Theme.success() : Theme.textMuted());
-        Render2D.textRight(gfx, font, CreateKnowledge.totalEntries() + " entries",
+        Render2D.textRight(gfx, textRenderer, CreateKnowledge.totalEntries() + " entries",
                 windowX + WINDOW_WIDTH - PADDING, y + 8, Theme.textMuted(), false);
     }
 
     // -- input ----------------------------------------------------------------------------
 
     @Override
-    public boolean mouseClicked(MouseButtonEvent event, boolean doubleClick) {
-        double mouseX = event.x();
-        double mouseY = event.y();
+    public boolean mouseClicked(double clickX, double clickY, int button) {
+        double mouseX = clickX;
+        double mouseY = clickY;
 
         double searchX = contentX() + PADDING;
         double searchY = windowY + 13;
@@ -342,15 +339,15 @@ public class CreateHelperScreen extends Screen {
         }
 
         if (selectedTopic == CALCULATOR_TAB) {
-            return handleCalculatorClick(mouseX, mouseY, event.button());
+            return handleCalculatorClick(mouseX, mouseY, button);
         }
-        return super.mouseClicked(event, doubleClick);
+        return super.mouseClicked(clickX, clickY, button);
     }
 
     private boolean handleCalculatorClick(double mouseX, double mouseY, int button) {
         double x = contentX() + PADDING;
         double listWidth = (contentWidth() - PADDING * 2) * 0.52;
-        double y = bodyTop() + 6 - scroll + font.lineHeight + 6;
+        double y = bodyTop() + 6 - scroll + textRenderer.fontHeight + 6;
 
         for (StressCalculator.Machine machine : StressCalculator.MACHINES) {
             if (MathUtil.within(mouseX, mouseY, x, y, x + listWidth, y + 15)) {
@@ -367,7 +364,7 @@ public class CreateHelperScreen extends Screen {
     }
 
     @Override
-    public boolean mouseScrolled(double mouseX, double mouseY, double horizontal, double vertical) {
+    public boolean mouseScrolled(double mouseX, double mouseY, double vertical) {
         double viewport = bodyBottom() - bodyTop();
         double max = Math.max(0, contentHeightCache - viewport + 16);
         scroll = MathUtil.clamp(scroll - vertical * 18, 0, max);
@@ -375,15 +372,15 @@ public class CreateHelperScreen extends Screen {
     }
 
     @Override
-    public boolean keyPressed(KeyEvent event) {
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         if (searchFocused) {
-            if (event.key() == GLFW.GLFW_KEY_BACKSPACE) {
+            if (keyCode == GLFW.GLFW_KEY_BACKSPACE) {
                 if (!searchQuery.isEmpty()) {
                     searchQuery = searchQuery.substring(0, searchQuery.length() - 1);
                 }
                 return true;
             }
-            if (event.key() == GLFW.GLFW_KEY_ESCAPE) {
+            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
                 if (!searchQuery.isEmpty()) {
                     searchQuery = "";
                 } else {
@@ -392,16 +389,16 @@ public class CreateHelperScreen extends Screen {
                 return true;
             }
         }
-        return super.keyPressed(event);
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override
-    public boolean charTyped(CharacterEvent event) {
+    public boolean charTyped(char chr, int modifiers) {
         if (searchFocused) {
-            searchQuery += event.codepointAsString();
+            searchQuery += String.valueOf(chr);
             scroll = 0;
             return true;
         }
-        return super.charTyped(event);
+        return super.charTyped(chr, modifiers);
     }
 }

@@ -9,11 +9,11 @@ import com.gadzo.client.ui.Theme;
 import com.gadzo.client.util.ColorUtil;
 import com.gadzo.client.util.Mc;
 
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.world.entity.EquipmentSlot;
-import net.minecraft.world.item.ItemStack;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.entity.EquipmentSlot;
+import net.minecraft.item.ItemStack;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -67,18 +67,18 @@ public class ArmorHud extends HudModule {
     /** The stacks to draw, in display order, honouring the "hide empty" setting. */
     private List<ItemStack> stacks() {
         List<ItemStack> result = new ArrayList<>(5);
-        LocalPlayer player = Mc.player();
+        ClientPlayerEntity player = Mc.player();
         if (player == null) {
             return result;
         }
         for (EquipmentSlot slot : ARMOR_SLOTS) {
-            ItemStack stack = player.getItemBySlot(slot);
+            ItemStack stack = player.getEquippedStack(slot);
             if (!stack.isEmpty() || !hideEmpty.get()) {
                 result.add(stack);
             }
         }
         if (showHeldItem.get()) {
-            ItemStack held = player.getItemBySlot(EquipmentSlot.MAINHAND);
+            ItemStack held = player.getEquippedStack(EquipmentSlot.MAINHAND);
             if (!held.isEmpty() || !hideEmpty.get()) {
                 result.add(held);
             }
@@ -88,10 +88,10 @@ public class ArmorHud extends HudModule {
 
     /** Remaining durability in {@code [0, 1]}, or -1 when the item has none. */
     private static double durability(ItemStack stack) {
-        if (stack.isEmpty() || !stack.isDamageableItem() || stack.getMaxDamage() <= 0) {
+        if (stack.isEmpty() || !stack.isDamageable() || stack.getMaxDamage() <= 0) {
             return -1;
         }
-        return (stack.getMaxDamage() - stack.getDamageValue()) / (double) stack.getMaxDamage();
+        return (stack.getMaxDamage() - stack.getDamage()) / (double) stack.getMaxDamage();
     }
 
     private static int durabilityColor(double fraction) {
@@ -101,17 +101,17 @@ public class ArmorHud extends HudModule {
     }
 
     /** Height of one cell, including the durability text and bar when enabled. */
-    private double cellHeight(Font font) {
-        return showDurability.get() ? ICON + 2 + font.lineHeight + BAR_HEIGHT + 1 : ICON;
+    private double cellHeight(TextRenderer font) {
+        return showDurability.get() ? ICON + 2 + font.fontHeight + BAR_HEIGHT + 1 : ICON;
     }
 
-    private double cellWidth(Font font) {
+    private double cellWidth(TextRenderer font) {
         // Wide enough for "100%" so the row does not jitter as durability ticks down.
-        return showDurability.get() ? Math.max(ICON, font.width("100%")) : ICON;
+        return showDurability.get() ? Math.max(ICON, font.getWidth("100%")) : ICON;
     }
 
     @Override
-    public double contentWidth(Font font) {
+    public double contentWidth(TextRenderer font) {
         int count = Math.max(1, stacks().size());
         return layout.is(Layout.HORIZONTAL)
                 ? count * cellWidth(font) + (count - 1) * SPACING
@@ -119,7 +119,7 @@ public class ArmorHud extends HudModule {
     }
 
     @Override
-    public double contentHeight(Font font) {
+    public double contentHeight(TextRenderer font) {
         int count = Math.max(1, stacks().size());
         return layout.is(Layout.HORIZONTAL)
                 ? cellHeight(font)
@@ -127,7 +127,7 @@ public class ArmorHud extends HudModule {
     }
 
     @Override
-    protected void renderContent(GuiGraphicsExtractor gfx, Font font) {
+    protected void renderContent(DrawContext gfx, TextRenderer font) {
         List<ItemStack> stacks = stacks();
         double cellW = cellWidth(font);
         double cellH = cellHeight(font);
@@ -138,8 +138,8 @@ public class ArmorHud extends HudModule {
             // Centre the 16px icon inside a cell that may be wider for the percentage text.
             double iconX = x + (cellW - ICON) / 2.0;
             if (!stack.isEmpty()) {
-                gfx.item(stack, (int) Math.round(iconX), (int) Math.round(y));
-                gfx.itemDecorations(font, stack, (int) Math.round(iconX), (int) Math.round(y));
+                gfx.drawItem(stack, (int) Math.round(iconX), (int) Math.round(y));
+                gfx.drawItemInSlot(font, stack, (int) Math.round(iconX), (int) Math.round(y));
             }
 
             double fraction = durability(stack);
@@ -149,7 +149,7 @@ public class ArmorHud extends HudModule {
                 Render2D.textCentered(gfx, font, label, x + cellW / 2.0, y + ICON + 2, color,
                         hasTextShadow());
 
-                double barY = y + ICON + 2 + font.lineHeight;
+                double barY = y + ICON + 2 + font.fontHeight;
                 Render2D.rect(gfx, x, barY, cellW, BAR_HEIGHT,
                         ColorUtil.withAlpha(Theme.trackOff(), 170));
                 Render2D.rect(gfx, x, barY, cellW * fraction, BAR_HEIGHT, color);

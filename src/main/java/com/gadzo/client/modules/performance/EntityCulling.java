@@ -6,11 +6,11 @@ import com.gadzo.client.core.setting.BooleanSetting;
 import com.gadzo.client.core.setting.NumberSetting;
 import com.gadzo.client.util.Mc;
 
-import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.decoration.ArmorStand;
-import net.minecraft.world.entity.decoration.ItemFrame;
-import net.minecraft.world.entity.item.ItemEntity;
-import net.minecraft.world.entity.player.Player;
+import net.minecraft.entity.Entity;
+import net.minecraft.entity.decoration.ArmorStandEntity;
+import net.minecraft.entity.decoration.ItemFrameEntity;
+import net.minecraft.entity.ItemEntity;
+import net.minecraft.entity.player.PlayerEntity;
 
 /**
  * Skips rendering entities that are far away or cheap to lose.
@@ -71,7 +71,7 @@ public class EntityCulling extends Module {
         if (entity == Mc.player()) {
             return false;
         }
-        if (keepPlayers.get() && entity instanceof Player) {
+        if (keepPlayers.get() && entity instanceof PlayerEntity) {
             return false;
         }
 
@@ -81,11 +81,11 @@ public class EntityCulling extends Module {
                 return false;
             }
             limit = Math.min(limit, itemDistance.get());
-        } else if (entity instanceof ItemFrame) {
+        } else if (entity instanceof ItemFrameEntity) {
             if (!cullItemFrames.get()) {
                 return false;
             }
-        } else if (entity instanceof ArmorStand) {
+        } else if (entity instanceof ArmorStandEntity) {
             if (!cullArmorStands.get()) {
                 return false;
             }
@@ -95,6 +95,6 @@ public class EntityCulling extends Module {
             return false;
         }
         // Squared comparison: avoids a sqrt per entity per frame.
-        return entity.distanceToSqr(Mc.player()) > limit * limit;
+        return entity.squaredDistanceTo(Mc.player()) > limit * limit;
     }
 }

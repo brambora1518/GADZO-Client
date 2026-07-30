@@ -8,8 +8,8 @@ import com.gadzo.client.ui.Theme;
 import com.gadzo.client.util.ColorUtil;
 import com.gadzo.client.util.Mc;
 
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
 
 /** Heap usage, with an optional bar — the quickest way to spot a memory leak mid-session. */
 public class MemoryHud extends HudModule {
@@ -35,23 +35,23 @@ public class MemoryHud extends HudModule {
     }
 
     @Override
-    public double contentWidth(Font font) {
-        return font.width(text());
+    public double contentWidth(TextRenderer font) {
+        return font.getWidth(text());
     }
 
     @Override
-    public double contentHeight(Font font) {
-        return font.lineHeight + (showBar.get() ? BAR_HEIGHT + 2 : 0);
+    public double contentHeight(TextRenderer font) {
+        return font.fontHeight + (showBar.get() ? BAR_HEIGHT + 2 : 0);
     }
 
     @Override
-    protected void renderContent(GuiGraphicsExtractor gfx, Font font) {
+    protected void renderContent(DrawContext gfx, TextRenderer font) {
         String value = text();
         line(gfx, font, value, 0, 0, color());
 
         if (showBar.get()) {
-            double width = font.width(value);
-            double y = font.lineHeight + 2;
+            double width = font.getWidth(value);
+            double y = font.fontHeight + 2;
             Render2D.roundedRect(gfx, 0, y, width, BAR_HEIGHT, BAR_HEIGHT / 2.0,
                     ColorUtil.withAlpha(Theme.trackOff(), 180));
             double filled = width * Mc.memoryFraction();

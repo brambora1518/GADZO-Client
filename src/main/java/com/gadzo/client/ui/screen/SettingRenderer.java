@@ -13,8 +13,8 @@ import com.gadzo.client.util.Animation;
 import com.gadzo.client.util.ColorUtil;
 import com.gadzo.client.util.MathUtil;
 
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
 
 import java.util.HashMap;
 import java.util.Map;
@@ -92,9 +92,9 @@ public final class SettingRenderer {
     }
 
     /** Extra height a row needs beyond {@link #ROW_HEIGHT}, e.g. for an expanded dropdown. */
-    public static double extraHeight(Setting<?> setting, Font font) {
+    public static double extraHeight(Setting<?> setting, TextRenderer font) {
         if (setting instanceof EnumSetting<?> enumSetting && openDropdown == enumSetting) {
-            return enumSetting.constants().length * (font.lineHeight + 5) + 4;
+            return enumSetting.constants().length * (font.fontHeight + 5) + 4;
         }
         if (setting instanceof ColorSetting && openPicker != null && openPicker.setting() == setting) {
             return openPicker.height() + 4;
@@ -107,7 +107,7 @@ public final class SettingRenderer {
      *
      * @param width the full row width; controls are right-aligned within it
      */
-    public static void render(GuiGraphicsExtractor gfx, Font font, Setting<?> setting,
+    public static void render(DrawContext gfx, TextRenderer font, Setting<?> setting,
                               double x, double y, double width, double mouseX, double mouseY) {
         boolean hovered = MathUtil.within(mouseX, mouseY, x, y, x + width, y + ROW_HEIGHT);
         Animation hoverAnimation = hover(setting);
@@ -118,7 +118,7 @@ public final class SettingRenderer {
                     ColorUtil.fade(Theme.surfaceHover(), hoverAnimation.value() * 0.6));
         }
 
-        double textY = y + (ROW_HEIGHT - font.lineHeight) / 2.0;
+        double textY = y + (ROW_HEIGHT - font.fontHeight) / 2.0;
         Render2D.text(gfx, font, setting.getName(), x, textY, Theme.textSecondary());
 
         double right = x + width;
@@ -140,7 +140,7 @@ public final class SettingRenderer {
         }
     }
 
-    private static void renderToggle(GuiGraphicsExtractor gfx, BooleanSetting setting, double x, double y) {
+    private static void renderToggle(DrawContext gfx, BooleanSetting setting, double x, double y) {
         Animation animation = toggle(setting, setting.get());
         animation.toBoolean(setting.get());
         double t = animation.value();
@@ -155,7 +155,7 @@ public final class SettingRenderer {
         Render2D.circle(gfx, knobX, y + TOGGLE_HEIGHT / 2.0, knobRadius, 0xFFFFFFFF);
     }
 
-    private static void renderSlider(GuiGraphicsExtractor gfx, Font font, NumberSetting setting,
+    private static void renderSlider(DrawContext gfx, TextRenderer font, NumberSetting setting,
                                      double x, double y, double width) {
         String value = setting.display();
         Render2D.textRight(gfx, font, value, x + width, y + 3, Theme.textPrimary(), false);
@@ -170,10 +170,10 @@ public final class SettingRenderer {
         Render2D.circle(gfx, x + filled, trackY + SLIDER_HEIGHT / 2.0, 4.0, 0xFFFFFFFF);
     }
 
-    private static void renderDropdown(GuiGraphicsExtractor gfx, Font font, EnumSetting<?> setting,
+    private static void renderDropdown(DrawContext gfx, TextRenderer font, EnumSetting<?> setting,
                                        double right, double y, double mouseX, double mouseY) {
         String label = setting.currentLabel();
-        double boxWidth = Math.max(56, font.width(label) + 18);
+        double boxWidth = Math.max(56, font.getWidth(label) + 18);
         double boxX = right - boxWidth;
         double boxY = y + (ROW_HEIGHT - 16) / 2.0;
 
@@ -187,7 +187,7 @@ public final class SettingRenderer {
             return;
         }
 
-        double optionHeight = font.lineHeight + 5;
+        double optionHeight = font.fontHeight + 5;
         double listY = boxY + 18;
         double listHeight = setting.constants().length * optionHeight + 4;
         Render2D.shadow(gfx, boxX, listY, boxWidth, listHeight, Theme.radiusSmall(), 4, Theme.shadowColor());
@@ -217,16 +217,16 @@ public final class SettingRenderer {
         return setting.label((E) constant);
     }
 
-    private static void renderSwatch(GuiGraphicsExtractor gfx, ColorSetting setting, double x, double y) {
+    private static void renderSwatch(DrawContext gfx, ColorSetting setting, double x, double y) {
         Render2D.roundedRect(gfx, x - 1, y - 1, SWATCH_SIZE + 2, SWATCH_SIZE + 2,
                 Theme.radiusSmall(), Theme.border());
         Render2D.roundedRect(gfx, x, y, SWATCH_SIZE, SWATCH_SIZE, Theme.radiusSmall(), setting.get());
     }
 
-    private static void renderKeybind(GuiGraphicsExtractor gfx, Font font, KeybindSetting setting,
+    private static void renderKeybind(DrawContext gfx, TextRenderer font, KeybindSetting setting,
                                       double right, double y) {
         String label = setting.display();
-        double boxWidth = Math.max(46, font.width(label) + 14);
+        double boxWidth = Math.max(46, font.getWidth(label) + 14);
         double boxX = right - boxWidth;
         double boxY = y + (ROW_HEIGHT - 16) / 2.0;
 
@@ -245,7 +245,7 @@ public final class SettingRenderer {
      *
      * @return whether the click was consumed
      */
-    public static boolean mouseClicked(Setting<?> setting, Font font, double x, double y, double width,
+    public static boolean mouseClicked(Setting<?> setting, TextRenderer font, double x, double y, double width,
                                        double mouseX, double mouseY, int button) {
         double right = x + width;
 
@@ -295,12 +295,12 @@ public final class SettingRenderer {
         return false;
     }
 
-    private static boolean selectFromDropdown(EnumSetting<?> setting, Font font, double right, double y,
+    private static boolean selectFromDropdown(EnumSetting<?> setting, TextRenderer font, double right, double y,
                                               double mouseX, double mouseY) {
-        double label = font.width(setting.currentLabel());
+        double label = font.getWidth(setting.currentLabel());
         double boxWidth = Math.max(56, label + 18);
         double boxX = right - boxWidth;
-        double optionHeight = font.lineHeight + 5;
+        double optionHeight = font.fontHeight + 5;
         double optionY = y + (ROW_HEIGHT - 16) / 2.0 + 18 + 2;
 
         for (Object constant : setting.constants()) {

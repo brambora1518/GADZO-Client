@@ -2,21 +2,16 @@ package com.gadzo.client.mixin;
 
 import com.gadzo.client.modules.performance.EntityCulling;
 
-import net.minecraft.client.renderer.culling.Frustum;
-import net.minecraft.client.renderer.entity.EntityRenderDispatcher;
-import net.minecraft.world.entity.Entity;
+import net.minecraft.client.render.Frustum;
+import net.minecraft.client.render.entity.EntityRenderDispatcher;
+import net.minecraft.entity.Entity;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 
-/**
- * Applies the entity-culling module's decision.
- *
- * <p>Injected at HEAD and cancelling so a culled entity costs nothing beyond the distance
- * check itself.
- */
+/** Applies the entity-culling module's decision. */
 @Mixin(EntityRenderDispatcher.class)
 public class EntityRenderDispatcherMixin {
 

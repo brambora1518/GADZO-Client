@@ -1,5 +1,5 @@
 plugins {
-	id 'net.fabricmc.fabric-loom' version "${loom_version}"
+	id 'fabric-loom' version "${loom_version}"
 }
 
 version = project.mod_version
@@ -10,6 +10,8 @@ base {
 }
 
 repositories {
+	// Create Fabric and its dependencies are published here rather than to Maven Central.
+	maven { name = 'Modrinth'; url = 'https://api.modrinth.com/maven' }
 	maven { name = 'Terraformers'; url = 'https://maven.terraformersmc.com/' }
 }
 
@@ -19,15 +21,14 @@ loom {
 			sourceSet sourceSets.main
 		}
 	}
-	runConfigs.configureEach {
-		ideConfigGenerated = true
-	}
 }
 
 dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
-	implementation "net.fabricmc:fabric-loader:${project.loader_version}"
-	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	// 1.20.1 predates Fabric's move to official mappings, so this branch uses Yarn.
+	mappings "net.fabricmc:yarn:${project.yarn_mappings}:v2"
+	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
 }
 
 processResources {
@@ -37,27 +38,16 @@ processResources {
 		loader_version    : project.loader_version
 	]
 	inputs.properties props
-
-	filesMatching('fabric.mod.json') {
-		expand props
-	}
+	filesMatching('fabric.mod.json') { expand props }
 }
 
 tasks.withType(JavaCompile).configureEach {
-	it.options.release = 25
+	it.options.release = 17
 	it.options.encoding = 'UTF-8'
 }
 
 java {
 	withSourcesJar()
-	sourceCompatibility = JavaVersion.VERSION_25
-	targetCompatibility = JavaVersion.VERSION_25
-}
-
-jar {
-	def projectName = project.name
-	inputs.property 'projectName', projectName
-	from('LICENSE') {
-		rename { "${it}_$projectName" }
-	}
+	sourceCompatibility = JavaVersion.VERSION_17
+	targetCompatibility = JavaVersion.VERSION_17
 }

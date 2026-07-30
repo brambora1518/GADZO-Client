@@ -42,7 +42,7 @@ import com.gadzo.client.ui.screen.TitleScreenBranding;
 import net.fabricmc.api.ClientModInitializer;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientLifecycleEvents;
 import net.fabricmc.fabric.api.client.event.lifecycle.v1.ClientTickEvents;
-import net.minecraft.resources.Identifier;
+import net.minecraft.util.Identifier;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -70,7 +70,7 @@ public class GadzoClient implements ClientModInitializer {
     }
 
     public static Identifier id(String path) {
-        return Identifier.fromNamespaceAndPath(MOD_ID, path);
+        return new Identifier(MOD_ID, path);
     }
 
     @Override
@@ -91,7 +91,7 @@ public class GadzoClient implements ClientModInitializer {
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> MODULES.tick());
 
-        // Options are not ready during mod init, so the saved profile is applied once the
+        // GameOptions are not ready during mod init, so the saved profile is applied once the
         // game has finished starting.
         ClientLifecycleEvents.CLIENT_STARTED.register(client -> {
             if (renderTuning != null) {

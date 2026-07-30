@@ -9,14 +9,14 @@ import com.gadzo.client.core.setting.NumberSetting;
 import com.gadzo.client.core.system.SystemProfile;
 import com.gadzo.client.util.Mc;
 
-import net.minecraft.client.CloudStatus;
-import net.minecraft.client.Options;
-import net.minecraft.server.level.ParticleStatus;
+import net.minecraft.client.option.CloudRenderMode;
+import net.minecraft.client.option.GameOptions;
+import net.minecraft.client.option.ParticlesMode;
 
 /**
  * One place to drive the vanilla render options that actually move the frame rate.
  *
- * <p>These all map onto real {@code Options} entries rather than custom rendering, which is
+ * <p>These all map onto real {@code GameOptions} entries rather than custom rendering, which is
  * what makes them safe: nothing here reimplements a render path, so there is no chance of a
  * visual desync with the rest of the game. The value is in exposing them together, applying
  * them as a coherent preset, and putting them one keystroke away instead of four menus deep.
@@ -53,8 +53,8 @@ public class RenderTuning extends Module {
     private final NumberSetting entityDistance;
     private final NumberSetting biomeBlend;
     private final NumberSetting mipmap;
-    private final EnumSetting<ParticleStatus> particles;
-    private final EnumSetting<CloudStatus> clouds;
+    private final EnumSetting<ParticlesMode> particles;
+    private final EnumSetting<CloudRenderMode> clouds;
     private final BooleanSetting ambientOcclusion;
     private final BooleanSetting vignette;
     private final BooleanSetting entityShadows;
@@ -84,8 +84,8 @@ public class RenderTuning extends Module {
                 "Smoothing between biome colours; costs chunk rebuild time");
         this.mipmap = addNumber("Mipmap levels", 4, 0, 4, 1,
                 "Leave at 4 unless VRAM-starved — lowering it usually costs frames, not saves them");
-        this.particles = addEnum("Particles", ParticleStatus.ALL, "Vanilla particle detail");
-        this.clouds = addEnum("Clouds", CloudStatus.FANCY, "Cloud rendering mode");
+        this.particles = addEnum("Particles", ParticlesMode.ALL, "Vanilla particle detail");
+        this.clouds = addEnum("Clouds", CloudRenderMode.FANCY, "Cloud rendering mode");
         this.ambientOcclusion = addBool("Ambient occlusion", true, "Soft corner shading");
         this.vignette = addBool("Vignette", true, "Darkened screen edges");
         this.entityShadows = addBool("Entity shadows", true, "Blob shadows under entities");
@@ -118,13 +118,13 @@ public class RenderTuning extends Module {
             // cache. The levers that actually pay are the CPU-side ones — render and
             // simulation distance, entity range, biome blend.
             switch (value) {
-                case QUALITY -> set(16, 12, 150, 5, 4, ParticleStatus.ALL, CloudStatus.FANCY,
+                case QUALITY -> set(16, 12, 150, 5, 4, ParticlesMode.ALL, CloudRenderMode.FANCY,
                         true, true, true, true);
-                case BALANCED -> set(12, 10, 100, 2, 4, ParticleStatus.DECREASED, CloudStatus.FAST,
+                case BALANCED -> set(12, 10, 100, 2, 4, ParticlesMode.DECREASED, CloudRenderMode.FAST,
                         true, true, true, true);
-                case PERFORMANCE -> set(8, 6, 75, 0, 4, ParticleStatus.DECREASED, CloudStatus.OFF,
+                case PERFORMANCE -> set(8, 6, 75, 0, 4, ParticlesMode.DECREASED, CloudRenderMode.OFF,
                         false, false, false, true);
-                case EXTREME -> set(5, 5, 50, 0, 4, ParticleStatus.MINIMAL, CloudStatus.OFF,
+                case EXTREME -> set(5, 5, 50, 0, 4, ParticlesMode.MINIMAL, CloudRenderMode.OFF,
                         false, false, false, false);
                 case AUTO -> applyAutoPreset();
                 default -> {
@@ -140,7 +140,7 @@ public class RenderTuning extends Module {
     /**
      * Picks values from the detected hardware tier.
      *
-     * <p>Deliberately biased towards the CPU-side settings: Minecraft saturates draw-call
+     * <p>Deliberately biased towards the CPU-side settings: MinecraftClient saturates draw-call
      * submission and chunk meshing long before it saturates a discrete GPU's shader units, so
      * a mid-range discrete card paired with a modest CPU wants a lower render distance rather
      * than lower visual fidelity.
@@ -148,19 +148,19 @@ public class RenderTuning extends Module {
     private void applyAutoPreset() {
         SystemProfile.Tier tier = SystemProfile.detectTier();
         switch (tier) {
-            case ULTRA -> set(20, 14, 150, 5, 4, ParticleStatus.ALL, CloudStatus.FANCY,
+            case ULTRA -> set(20, 14, 150, 5, 4, ParticlesMode.ALL, CloudRenderMode.FANCY,
                     true, true, true, true);
-            case HIGH -> set(14, 10, 125, 3, 4, ParticleStatus.ALL, CloudStatus.FANCY,
+            case HIGH -> set(14, 10, 125, 3, 4, ParticlesMode.ALL, CloudRenderMode.FANCY,
                     true, true, true, true);
-            case MEDIUM -> set(10, 8, 100, 1, 4, ParticleStatus.DECREASED, CloudStatus.FAST,
+            case MEDIUM -> set(10, 8, 100, 1, 4, ParticlesMode.DECREASED, CloudRenderMode.FAST,
                     true, false, true, true);
-            case LOW -> set(7, 6, 75, 0, 4, ParticleStatus.DECREASED, CloudStatus.OFF,
+            case LOW -> set(7, 6, 75, 0, 4, ParticlesMode.DECREASED, CloudRenderMode.OFF,
                     false, false, false, true);
         }
     }
 
     private void set(int render, int simulation, int entity, int blend, int mip,
-                     ParticleStatus particleStatus, CloudStatus cloudStatus,
+                     ParticlesMode particleStatus, CloudRenderMode cloudStatus,
                      boolean ao, boolean vig, boolean shadows, boolean bobbing) {
         renderDistance.setValue((double) render);
         simulationDistance.setValue((double) simulation);
@@ -177,23 +177,22 @@ public class RenderTuning extends Module {
 
     /** Reads the current vanilla options in, so the module starts in sync with the game. */
     public void pullFromGame() {
-        Options options = Mc.client() == null ? null : Mc.client().options;
+        GameOptions options = Mc.client() == null ? null : Mc.client().options;
         if (options == null) {
             return;
         }
         applying = true;
         try {
-            renderDistance.setValue((double) options.renderDistance().get());
-            simulationDistance.setValue((double) options.simulationDistance().get());
-            entityDistance.setValue(options.entityDistanceScaling().get() * 100.0);
-            biomeBlend.setValue((double) options.biomeBlendRadius().get());
-            mipmap.setValue((double) options.mipmapLevels().get());
-            particles.setValue(options.particles().get());
-            clouds.setValue(options.cloudStatus().get());
-            ambientOcclusion.setValue(options.ambientOcclusion().get());
-            vignette.setValue(options.vignette().get());
-            entityShadows.setValue(options.entityShadows().get());
-            viewBobbing.setValue(options.bobView().get());
+            renderDistance.setValue((double) options.getViewDistance().getValue());
+            simulationDistance.setValue((double) options.getSimulationDistance().getValue());
+            entityDistance.setValue(options.getEntityDistanceScaling().getValue() * 100.0);
+            biomeBlend.setValue((double) options.getBiomeBlendRadius().getValue());
+            mipmap.setValue((double) options.getMipmapLevels().getValue());
+            particles.setValue(options.getParticles().getValue());
+            clouds.setValue(options.getCloudRenderMode().getValue());
+            ambientOcclusion.setValue(options.getAo().getValue());
+            entityShadows.setValue(options.getEntityShadows().getValue());
+            viewBobbing.setValue(options.getBobView().getValue());
         } finally {
             applying = false;
         }
@@ -201,21 +200,20 @@ public class RenderTuning extends Module {
 
     /** Writes every value through to the game. */
     public void apply() {
-        Options options = Mc.client() == null ? null : Mc.client().options;
+        GameOptions options = Mc.client() == null ? null : Mc.client().options;
         if (options == null) {
             return;
         }
-        options.renderDistance().set(renderDistance.getInt());
-        options.simulationDistance().set(simulationDistance.getInt());
-        options.entityDistanceScaling().set(entityDistance.get() / 100.0);
-        options.biomeBlendRadius().set(biomeBlend.getInt());
-        options.mipmapLevels().set(mipmap.getInt());
-        options.particles().set(particles.get());
-        options.cloudStatus().set(clouds.get());
-        options.ambientOcclusion().set(ambientOcclusion.get());
-        options.vignette().set(vignette.get());
-        options.entityShadows().set(entityShadows.get());
-        options.bobView().set(viewBobbing.get());
+        options.getViewDistance().setValue(renderDistance.getInt());
+        options.getSimulationDistance().setValue(simulationDistance.getInt());
+        options.getEntityDistanceScaling().setValue(entityDistance.get() / 100.0);
+        options.getBiomeBlendRadius().setValue(biomeBlend.getInt());
+        options.getMipmapLevels().setValue(mipmap.getInt());
+        options.getParticles().setValue(particles.get());
+        options.getCloudRenderMode().setValue(clouds.get());
+        options.getAo().setValue(ambientOcclusion.get());
+        options.getEntityShadows().setValue(entityShadows.get());
+        options.getBobView().setValue(viewBobbing.get());
     }
 
     @Override

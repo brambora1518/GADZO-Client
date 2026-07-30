@@ -6,8 +6,8 @@ import com.gadzo.client.core.input.InputTracker;
 import com.gadzo.client.core.setting.BooleanSetting;
 import com.gadzo.client.ui.Theme;
 
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
 
 /** Clicks per second for the left and (optionally) right mouse buttons. */
 public class CpsHud extends HudModule {
@@ -31,17 +31,17 @@ public class CpsHud extends HudModule {
     }
 
     @Override
-    public double contentWidth(Font font) {
-        return font.width(text());
+    public double contentWidth(TextRenderer font) {
+        return font.getWidth(text());
     }
 
     @Override
-    public double contentHeight(Font font) {
-        return font.lineHeight;
+    public double contentHeight(TextRenderer font) {
+        return font.fontHeight;
     }
 
     @Override
-    protected void renderContent(GuiGraphicsExtractor gfx, Font font) {
+    protected void renderContent(DrawContext gfx, TextRenderer font) {
         line(gfx, font, text(), 0, 0, Theme.textPrimary());
     }
 }

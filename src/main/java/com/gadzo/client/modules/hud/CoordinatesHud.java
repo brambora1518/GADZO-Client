@@ -6,16 +6,16 @@ import com.gadzo.client.core.setting.BooleanSetting;
 import com.gadzo.client.ui.Theme;
 import com.gadzo.client.util.Mc;
 
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.core.Direction;
-import net.minecraft.world.level.Level;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.util.math.Direction;
+import net.minecraft.world.World;
 
 import java.util.ArrayList;
 import java.util.List;
 
-/** Player position, facing, and optionally the Nether/Overworld coordinate conversion. */
+/** PlayerEntity position, facing, and optionally the Nether/Overworld coordinate conversion. */
 public class CoordinatesHud extends HudModule {
 
     private final BooleanSetting showFacing;
@@ -23,7 +23,7 @@ public class CoordinatesHud extends HudModule {
     private final BooleanSetting singleLine;
 
     public CoordinatesHud() {
-        super("Coordinates", "Player position and facing", HudAnchor.TOP_LEFT, 4, 32);
+        super("Coordinates", "PlayerEntity position and facing", HudAnchor.TOP_LEFT, 4, 32);
         this.showFacing = addBool("Facing", true, "Show which way you are looking");
         this.showDimensionConversion = addBool("Nether conversion", false,
                 "Show the matching coordinates in the other dimension");
@@ -32,7 +32,7 @@ public class CoordinatesHud extends HudModule {
 
     private List<String> lines() {
         List<String> lines = new ArrayList<>(3);
-        LocalPlayer player = Mc.player();
+        ClientPlayerEntity player = Mc.player();
         if (player == null) {
             return lines;
         }
@@ -52,14 +52,14 @@ public class CoordinatesHud extends HudModule {
         if (showDimensionConversion.get()) {
             // The Nether is 8 blocks of Overworld per block; which way to scale depends on
             // where the player currently is.
-            boolean inNether = player.level().dimension() == Level.NETHER;
+            boolean inNether = player.getWorld().getRegistryKey() == World.NETHER;
             int convertedX = inNether ? x * 8 : x / 8;
             int convertedZ = inNether ? z * 8 : z / 8;
             lines.add((inNether ? "OW: " : "NE: ") + convertedX + " " + convertedZ);
         }
 
         if (showFacing.get()) {
-            Direction facing = player.getDirection();
+            Direction facing = player.getHorizontalFacing();
             lines.add("Facing: " + capitalise(facing.getName()) + " " + axisHint(facing));
         }
 
@@ -85,25 +85,25 @@ public class CoordinatesHud extends HudModule {
     }
 
     @Override
-    public double contentWidth(Font font) {
+    public double contentWidth(TextRenderer font) {
         double widest = 0;
         for (String line : lines()) {
-            widest = Math.max(widest, font.width(line));
+            widest = Math.max(widest, font.getWidth(line));
         }
         return widest;
     }
 
     @Override
-    public double contentHeight(Font font) {
-        return Math.max(1, lines().size()) * font.lineHeight;
+    public double contentHeight(TextRenderer font) {
+        return Math.max(1, lines().size()) * font.fontHeight;
     }
 
     @Override
-    protected void renderContent(GuiGraphicsExtractor gfx, Font font) {
+    protected void renderContent(DrawContext gfx, TextRenderer font) {
         double y = 0;
         for (String text : lines()) {
             line(gfx, font, text, 0, y, Theme.textPrimary());
-            y += font.lineHeight;
+            y += font.fontHeight;
         }
     }
 }

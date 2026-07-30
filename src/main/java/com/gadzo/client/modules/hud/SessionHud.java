@@ -7,9 +7,9 @@ import com.gadzo.client.core.setting.BooleanSetting;
 import com.gadzo.client.ui.Theme;
 import com.gadzo.client.util.Mc;
 
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
-import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
+import net.minecraft.client.network.ClientPlayerEntity;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -48,10 +48,10 @@ public class SessionHud extends HudModule {
 
     @Override
     public void onTick() {
-        LocalPlayer player = Mc.player();
+        ClientPlayerEntity player = Mc.player();
         long now = System.currentTimeMillis();
 
-        if (player == null || Mc.client() == null || Mc.client().level == null) {
+        if (player == null || Mc.client() == null || Mc.client().world == null) {
             // Out of world: stop the clock rather than counting menu time.
             lastTickAt = now;
             primed = false;
@@ -113,25 +113,25 @@ public class SessionHud extends HudModule {
     }
 
     @Override
-    public double contentWidth(Font font) {
+    public double contentWidth(TextRenderer font) {
         double widest = 0;
         for (String line : lines()) {
-            widest = Math.max(widest, font.width(line));
+            widest = Math.max(widest, font.getWidth(line));
         }
         return widest;
     }
 
     @Override
-    public double contentHeight(Font font) {
-        return Math.max(0, lines().size()) * font.lineHeight;
+    public double contentHeight(TextRenderer font) {
+        return Math.max(0, lines().size()) * font.fontHeight;
     }
 
     @Override
-    protected void renderContent(GuiGraphicsExtractor gfx, Font font) {
+    protected void renderContent(DrawContext gfx, TextRenderer font) {
         double y = 0;
         for (String text : lines()) {
             line(gfx, font, text, 0, y, Theme.textPrimary());
-            y += font.lineHeight;
+            y += font.fontHeight;
         }
     }
 }

@@ -4,8 +4,8 @@ import com.gadzo.client.core.module.Module;
 import com.gadzo.client.core.module.ModuleCategory;
 import com.gadzo.client.core.setting.NumberSetting;
 
-import net.minecraft.client.Minecraft;
-import net.minecraft.client.Options;
+import net.minecraft.client.MinecraftClient;
+import net.minecraft.client.option.GameOptions;
 
 /**
  * Raises the brightness option beyond the slider's normal ceiling.
@@ -33,32 +33,32 @@ public class Fullbright extends Module {
         });
     }
 
-    private static Options options() {
-        Minecraft client = Minecraft.getInstance();
+    private static GameOptions options() {
+        MinecraftClient client = MinecraftClient.getInstance();
         return client == null ? null : client.options;
     }
 
     private void apply() {
-        Options options = options();
+        GameOptions options = options();
         if (options != null) {
-            options.gamma().set(brightness.get());
+            options.getGamma().setValue(brightness.get());
         }
     }
 
     @Override
     protected void onEnable() {
-        Options options = options();
+        GameOptions options = options();
         if (options != null) {
-            savedGamma = options.gamma().get();
+            savedGamma = options.getGamma().getValue();
             apply();
         }
     }
 
     @Override
     protected void onDisable() {
-        Options options = options();
+        GameOptions options = options();
         if (options != null && !Double.isNaN(savedGamma)) {
-            options.gamma().set(savedGamma);
+            options.getGamma().setValue(savedGamma);
             savedGamma = NOT_CAPTURED;
         }
     }

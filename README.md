@@ -249,3 +249,25 @@ to defaults, so a config from an older build still loads after new modules are a
 MIT. See [LICENSE](LICENSE).
 
 Not affiliated with Mojang, Microsoft, Lunar Client or Badlion Client.
+
+---
+
+## Branch: 1.20.1
+
+This branch targets **Minecraft 1.20.1 on Fabric**, which is the last version with a native
+[Create Fabric](https://modrinth.com/mod/create-fabric) build. Create runs without Sinytra
+Connector here, so a live integration can talk to the mod directly rather than through a
+compatibility layer. `main` stays on 26.2.
+
+Differences forced by the older API, rather than by choice:
+
+- **No backdrop blur.** The frosted-glass effect behind menus arrived with the render-state
+  rework in later versions. Screens fall back to a dim overlay, so `Theme.blurEnabled()` has
+  no visible effect on this branch.
+- **No bottleneck verdict.** 1.20.1 has no GPU timing API, so the client cannot say whether a
+  frame is CPU- or GPU-bound. That readout is absent rather than faked.
+- **The Hardware element names your CPU instead.** 1.20.1 exposes `GlDebugInfo.getCpuInfo()`,
+  a real processor model string, which later versions dropped.
+- **No sky/celestial toggle** in Weather render — only precipitation is skipped.
+
+Toolchain: Loom 1.7.4 (the last line that supports Yarn mappings), Gradle 8.8, Java 17.

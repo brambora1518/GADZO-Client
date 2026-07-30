@@ -6,8 +6,8 @@ import com.gadzo.client.ui.Theme;
 import com.gadzo.client.util.ColorUtil;
 import com.gadzo.client.util.MathUtil;
 
-import net.minecraft.client.gui.Font;
-import net.minecraft.client.gui.GuiGraphicsExtractor;
+import net.minecraft.client.font.TextRenderer;
+import net.minecraft.client.gui.DrawContext;
 
 /**
  * A saturation/value field with hue and alpha sliders.
@@ -87,7 +87,7 @@ public class ColorPicker {
 
     // -- rendering ---------------------------------------------------------------------
 
-    public void render(GuiGraphicsExtractor gfx, Font font, double x, double y) {
+    public void render(DrawContext gfx, TextRenderer font, double x, double y) {
         Render2D.shadow(gfx, x, y, WIDTH, height(), Theme.radiusSmall(), 5, Theme.shadowColor());
         Render2D.roundedRect(gfx, x, y, WIDTH, height(), Theme.radiusSmall(), Theme.surfaceHigh());
 
@@ -117,7 +117,7 @@ public class ColorPicker {
      * saturated hue down to black, which gets both axes from one {@code fillGradient} per
      * column instead of a fill per pixel.
      */
-    private void drawSaturationValueField(GuiGraphicsExtractor gfx, double x, double y, double width) {
+    private void drawSaturationValueField(DrawContext gfx, double x, double y, double width) {
         int columns = (int) Math.ceil(width / FIELD_STEP);
         for (int i = 0; i < columns; i++) {
             double columnX = x + i * FIELD_STEP;
@@ -138,7 +138,7 @@ public class ColorPicker {
         Render2D.circle(gfx, markerX, markerY, 1.5, ColorUtil.hsb(hue, saturation, value, 255));
     }
 
-    private void drawHueSlider(GuiGraphicsExtractor gfx, double x, double y, double width) {
+    private void drawHueSlider(DrawContext gfx, double x, double y, double width) {
         int steps = (int) Math.ceil(width / FIELD_STEP);
         for (int i = 0; i < steps; i++) {
             double stepX = x + i * FIELD_STEP;
@@ -149,7 +149,7 @@ public class ColorPicker {
         drawSliderKnob(gfx, x + hue * width, y);
     }
 
-    private void drawAlphaSlider(GuiGraphicsExtractor gfx, double x, double y, double width) {
+    private void drawAlphaSlider(DrawContext gfx, double x, double y, double width) {
         // Checkerboard so transparency is legible rather than reading as a dark colour.
         for (int i = 0; i * 4 < width; i++) {
             double cellX = x + i * 4;
@@ -165,7 +165,7 @@ public class ColorPicker {
         drawSliderKnob(gfx, x + (alpha / 255.0) * width, y);
     }
 
-    private void drawSliderKnob(GuiGraphicsExtractor gfx, double centerX, double y) {
+    private void drawSliderKnob(DrawContext gfx, double centerX, double y) {
         Render2D.rect(gfx, centerX - 1.5, y - 1, 3, SLIDER_HEIGHT + 2, 0xFFFFFFFF);
         Render2D.rect(gfx, centerX - 0.5, y, 1, SLIDER_HEIGHT, 0xFF11151C);
     }
