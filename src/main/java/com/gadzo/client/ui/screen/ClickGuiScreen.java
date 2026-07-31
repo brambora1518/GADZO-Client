@@ -3,9 +3,7 @@ package com.gadzo.client.ui.screen;
 import com.gadzo.client.GadzoClient;
 import com.gadzo.client.core.config.ConfigManager;
 import com.gadzo.client.core.module.Module;
-import com.gadzo.client.core.module.ModuleCategory;
 import com.gadzo.client.core.setting.Setting;
-import com.gadzo.client.core.system.SystemProfile;
 import com.gadzo.client.ui.Render2D;
 import com.gadzo.client.ui.Theme;
 import com.gadzo.client.util.Animation;
@@ -20,60 +18,68 @@ import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
-import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 /**
- * The mods menu: category sidebar, searchable module list, and a settings panel.
+ * The mods menu, as a command palette.
  *
- * <p>Laid out as a single centred window rather than a full-screen takeover so the world
- * stays visible behind the blur, which is what makes tweaking a HUD element while in-game
- * practical.
+ * <p>One narrow column: a search field that is always focused, a flat list of every module in
+ * the client, and — for whichever row is expanded — that module's settings inline underneath
+ * it. There is no category sidebar and no separate settings pane.
+ *
+ * <p>That shape was chosen over the usual three-column layout deliberately. With thirty-odd
+ * modules, picking a category and then hunting a list is strictly more work than typing three
+ * letters, and the sidebar spends its whole life occupying a fifth of the window to save one
+ * keystroke. Search-first also means the same screen scales to a hundred modules without
+ * changing, and it removes the two internal panel edges that made the old layout read as a
+ * stack of boxes rather than a single surface.
+ *
+ * <p>Everything is keyboard-reachable: type to filter, arrows to move, enter to toggle, tab to
+ * expand settings. The mouse does all of it too, but the keyboard path is the fast one and the
+ * hint row at the bottom says so.
  */
 public class ClickGuiScreen extends Screen {
 
-    private static final double WINDOW_WIDTH = 620;
-    private static final double WINDOW_HEIGHT = 380;
-    private static final double SIDEBAR_WIDTH = 132;
-    private static final double HEADER_HEIGHT = 46;
-    private static final double FOOTER_HEIGHT = 26;
-    private static final double MODULE_ROW_HEIGHT = 34;
-    private static final double PADDING = 10;
+    private static final double PANEL_WIDTH = 430;
+    private static final double PANEL_HEIGHT = 396;
+    private static final double SEARCH_HEIGHT = 44;
+    private static final double ROW_HEIGHT = 30;
+    private static final double HINT_HEIGHT = 26;
+    private static final double PADDING = 16;
 
-    /** Fractional split between the module list and the settings panel. */
-    private static final double LIST_FRACTION = 0.48;
+    /** Vertical placement, as a fraction of the leftover space. Slightly above centre. */
+    private static final double PANEL_TOP_BIAS = 0.40;
 
     private final Animation openAnimation = new Animation(0.0, 300L, Easing.EXPO_OUT);
-    private final Map<ModuleCategory, Animation> categoryHover = new EnumMap<>(ModuleCategory.class);
-    private final Map<Module, Animation> moduleHover = new java.util.HashMap<>();
-    private final Map<Module, Animation> moduleToggle = new java.util.HashMap<>();
+    private final Map<Module, Animation> rowHighlight = new HashMap<>();
 
-    private ModuleCategory selectedCategory = ModuleCategory.PERFORMANCE;
-    private Module selectedModule;
+    /** The row whose settings are expanded, or {@code null}. */
+    private Module expanded;
+
+    /** Keyboard cursor, an index into {@link #visibleModules()}. */
+    private int cursor;
 
     private String searchQuery = "";
-    private boolean searchFocused;
+    private double scroll;
 
-    private double listScroll;
-    private double settingsScroll;
+    /** Total content height from the last frame, for scroll clamping. */
+    private double contentHeight;
 
     /** Cached each frame so input handlers agree with what was drawn. */
-    private double windowX;
-    private double windowY;
+    private double panelX;
+    private double panelY;
 
     public ClickGuiScreen() {
         super(Text.literal("GADZO"));
-        for (ModuleCategory category : ModuleCategory.values()) {
-            categoryHover.put(category, new Animation(0.0, 160L));
-        }
     }
 
     @Override
     protected void init() {
         openAnimation.to(1.0);
-        windowX = (width - WINDOW_WIDTH) / 2.0;
-        windowY = (height - WINDOW_HEIGHT) / 2.0;
+        panelX = (width - PANEL_WIDTH) / 2.0;
+        panelY = (height - PANEL_HEIGHT) * PANEL_TOP_BIAS;
     }
 
     @Override
@@ -81,452 +87,296 @@ public class ClickGuiScreen extends Screen {
         return false;
     }
 
-    // -- layout helpers -------------------------------------------------------------------
+    // -- model ----------------------------------------------------------------------------
 
-    private double contentX() {
-        return windowX + SIDEBAR_WIDTH;
+    /**
+     * The modules on screen, in registration order, filtered by the search.
+     *
+     * <p>Matching is delegated to the module manager so the palette and the {@code /gadzo}
+     * commands agree on what a query means.
+     */
+    private List<Module> visibleModules() {
+        List<Module> matches = searchQuery.isBlank()
+                ? GadzoClient.modules().all()
+                : GadzoClient.modules().search(searchQuery);
+
+        List<Module> visible = new ArrayList<>(matches.size());
+        for (Module module : matches) {
+            if (!module.isHidden()) {
+                visible.add(module);
+            }
+        }
+        return visible;
     }
 
-    private double contentWidth() {
-        return WINDOW_WIDTH - SIDEBAR_WIDTH;
-    }
-
-    private double listWidth() {
-        return contentWidth() * LIST_FRACTION;
+    private Animation highlightOf(Module module) {
+        return rowHighlight.computeIfAbsent(module, ignored -> new Animation(0.0, 160L));
     }
 
     private double listTop() {
-        return windowY + HEADER_HEIGHT;
+        return panelY + SEARCH_HEIGHT;
     }
 
     private double listBottom() {
-        return windowY + WINDOW_HEIGHT - FOOTER_HEIGHT;
-    }
-
-    private double settingsX() {
-        return contentX() + listWidth();
-    }
-
-    private double settingsWidth() {
-        return contentWidth() - listWidth();
+        return panelY + PANEL_HEIGHT - HINT_HEIGHT;
     }
 
     /**
-     * Y of the first setting row in the settings panel.
+     * Y of a row, accounting for the expanded module's settings pushing later rows down.
      *
-     * <p>Shared by the render pass and the click handler; if these two disagree by even a few
-     * pixels, clicks land on the wrong control.
+     * <p>Shared by the renderer and every hit test. Computing it twice is how a list ends up
+     * highlighting one row and toggling another.
      */
-    private double settingsFirstRowY() {
-        // Header block: title line, description line, separator, then the row area.
-        return listTop() + 8 - settingsScroll + (textRenderer.fontHeight + 2) + (textRenderer.fontHeight + 8) + 8;
-    }
-
-    /** Modules shown in the list for the current category and search query. */
-    private List<Module> visibleModules() {
-        if (!searchQuery.isBlank()) {
-            return GadzoClient.modules().search(searchQuery);
+    private double rowY(List<Module> modules, int index) {
+        double y = listTop() + 6 - scroll;
+        for (int i = 0; i < index; i++) {
+            y += ROW_HEIGHT;
+            if (modules.get(i) == expanded) {
+                y += settingsHeight(modules.get(i));
+            }
         }
-        return GadzoClient.modules().byCategory(selectedCategory);
+        return y;
     }
 
-    private Animation hoverOf(Module module) {
-        return moduleHover.computeIfAbsent(module, ignored -> new Animation(0.0, 150L));
+    /** Height the expanded settings block occupies, including its own padding. */
+    private double settingsHeight(Module module) {
+        double height = 4;
+        height += SettingRenderer.ROW_HEIGHT + SettingRenderer.extraHeight(module.getKeybind(), textRenderer);
+        for (Setting<?> setting : module.getVisibleSettings()) {
+            height += SettingRenderer.ROW_HEIGHT + SettingRenderer.extraHeight(setting, textRenderer);
+        }
+        return height + 6;
     }
 
-    private Animation toggleOf(Module module) {
-        return moduleToggle.computeIfAbsent(module,
-                m -> new Animation(m.isEnabled() ? 1.0 : 0.0, 200L));
-    }
+    // -- rendering ------------------------------------------------------------------------
 
-    // -- rendering --------------------------------------------------------------------------
-
-    /**
-     * Frosted backdrop.
-     *
-     * <p>The dim is chosen by whether the blur actually ran. Blur already separates the panel
-     * from the world, so stacking the full dim on top of it would hide the very effect it is
-     * there to reveal; without blur, the dim is the only thing doing that job and has to carry
-     * it alone.
-     */
-    private void drawBackdrop(DrawContext gfx) {
+    @Override
+    public void render(DrawContext gfx, int mouseX, int mouseY, float partialTick) {
         double open = openAnimation.value();
         boolean blurred = Theme.blurEnabled() && Render2D.blurBehind(gfx);
         Render2D.rect(gfx, 0, 0, width, height,
                 ColorUtil.fade(blurred ? 0x38000000 : 0xB0000000, open));
-    }
 
-    @Override
-    public void render(DrawContext gfx, int mouseX, int mouseY, float partialTick) {
-        drawBackdrop(gfx);
-        windowX = (width - WINDOW_WIDTH) / 2.0;
-        windowY = (height - WINDOW_HEIGHT) / 2.0;
+        panelX = (width - PANEL_WIDTH) / 2.0;
+        panelY = (height - PANEL_HEIGHT) * PANEL_TOP_BIAS;
 
-        double open = openAnimation.value();
-
-        // Slide the window up slightly as it fades in.
-        double slide = (1.0 - open) * 18.0;
         gfx.getMatrices().push();
-        gfx.getMatrices().translate(0.0f, (float) slide, 0.0f);
+        gfx.getMatrices().translate(0.0f, (float) ((1.0 - open) * 14.0), 0.0f);
 
-        drawWindow(gfx, mouseX, mouseY, open);
+        Render2D.shadow(gfx, panelX, panelY, PANEL_WIDTH, PANEL_HEIGHT, Theme.radius(), 12,
+                ColorUtil.fade(Theme.shadowColor(), open));
+        Render2D.roundedRect(gfx, panelX, panelY, PANEL_WIDTH, PANEL_HEIGHT, Theme.radius(),
+                ColorUtil.fade(Theme.background(), open));
+
+        drawSearch(gfx, open);
+        drawList(gfx, mouseX, mouseY, open);
+        drawHint(gfx, open);
+
+        // The panel's single boundary: a hairline on its own outer edge. Nothing inside draws
+        // an outline of its own, which is what keeps this reading as one surface.
+        Render2D.roundedOutline(gfx, panelX, panelY, PANEL_WIDTH, PANEL_HEIGHT, Theme.radius(),
+                1.0, ColorUtil.fade(Theme.glassEdge(), open));
 
         gfx.getMatrices().pop();
     }
 
-    private void drawWindow(DrawContext gfx, int mouseX, int mouseY, double alpha) {
-        Render2D.shadow(gfx, windowX, windowY, WINDOW_WIDTH, WINDOW_HEIGHT, Theme.radius(), 10,
-                ColorUtil.fade(Theme.shadowColor(), alpha));
-        Render2D.roundedRect(gfx, windowX, windowY, WINDOW_WIDTH, WINDOW_HEIGHT, Theme.radius(),
-                ColorUtil.fade(Theme.background(), alpha));
+    private void drawSearch(DrawContext gfx, double alpha) {
+        double textY = panelY + (SEARCH_HEIGHT - textRenderer.fontHeight) / 2.0;
+        int muted = ColorUtil.fade(Theme.textMuted(), alpha);
 
-        drawSidebar(gfx, mouseX, mouseY, alpha);
-        drawHeader(gfx, mouseX, mouseY, alpha);
-        drawModuleList(gfx, mouseX, mouseY, alpha);
-        drawSettingsPanel(gfx, mouseX, mouseY, alpha);
-        drawFooter(gfx, alpha);
+        // A magnifier built from two circles and a bar — the client ships no texture atlas,
+        // and a glyph from the font would not sit right next to the text at this size.
+        double glassX = panelX + PADDING + 5;
+        double glassY = panelY + SEARCH_HEIGHT / 2.0 - 1;
+        Render2D.circle(gfx, glassX, glassY, 4.5, muted);
+        Render2D.circle(gfx, glassX, glassY, 3.0, ColorUtil.fade(Theme.background(), alpha));
+        Render2D.roundedRect(gfx, glassX + 3, glassY + 3, 4.5, 1.6, 0.8, muted);
 
-        // The one boundary the whole window gets: a hairline catching light on the edge of
-        // the glass. Everything inside is drawn without its own outline — this is the only
-        // stroke in the panel, which is the point.
-        Render2D.roundedOutline(gfx, windowX, windowY, WINDOW_WIDTH, WINDOW_HEIGHT, Theme.radius(),
-                1.0, ColorUtil.fade(Theme.glassEdge(), alpha));
-    }
+        double textX = panelX + PADDING + 20;
+        String shown = searchQuery.isEmpty() ? "Search modules" : searchQuery;
+        Render2D.text(gfx, textRenderer, shown, textX, textY,
+                searchQuery.isEmpty() ? muted : ColorUtil.fade(Theme.textPrimary(), alpha));
 
-    private void drawSidebar(DrawContext gfx, int mouseX, int mouseY, double alpha) {
-        Render2D.roundedRect(gfx, windowX, windowY, SIDEBAR_WIDTH, WINDOW_HEIGHT,
-                Theme.radius(), 0, 0, Theme.radius(),
-                ColorUtil.fade(Theme.surface(), alpha));
-
-        // Wordmark.
-        Render2D.text(gfx, textRenderer, "GADZO", windowX + PADDING + 2, windowY + 16,
-                ColorUtil.fade(Theme.accent(), alpha));
-        Render2D.text(gfx, textRenderer, "CLIENT", windowX + PADDING + 2 + textRenderer.getWidth("GADZO") + 4,
-                windowY + 16, ColorUtil.fade(Theme.textMuted(), alpha));
-
-        double y = windowY + HEADER_HEIGHT;
-        for (ModuleCategory category : ModuleCategory.values()) {
-            boolean hovered = MathUtil.within(mouseX, mouseY, windowX + 6, y,
-                    windowX + SIDEBAR_WIDTH - 6, y + 28);
-            boolean selected = category == selectedCategory && searchQuery.isBlank();
-
-            Animation animation = categoryHover.get(category);
-            animation.toBoolean(hovered || selected);
-
-            if (animation.value() > 0.01) {
-                Render2D.roundedRect(gfx, windowX + 6, y, SIDEBAR_WIDTH - 12, 28, Theme.radiusSmall(),
-                        ColorUtil.fade(selected
-                                ? ColorUtil.withAlpha(Theme.accent(), 42)
-                                : Theme.surfaceHover(), animation.value() * alpha));
-            }
-            if (selected) {
-                // Accent pill on the leading edge marks the active category.
-                Render2D.roundedRect(gfx, windowX + 6, y + 7, 3, 14, 1.5,
-                        ColorUtil.fade(Theme.accent(), alpha));
-            }
-
-            Render2D.text(gfx, textRenderer, category.displayName(), windowX + 18, y + (28 - textRenderer.fontHeight) / 2.0,
-                    ColorUtil.fade(selected ? Theme.textPrimary() : Theme.textSecondary(), alpha));
-
-            long enabled = GadzoClient.modules().byCategory(category).stream()
-                    .filter(Module::isEnabled).count();
-            if (enabled > 0) {
-                Render2D.textRight(gfx, textRenderer, Long.toString(enabled), windowX + SIDEBAR_WIDTH - 14,
-                        y + (28 - textRenderer.fontHeight) / 2.0,
-                        ColorUtil.fade(Theme.accent(), alpha), false);
-            }
-            y += 30;
-        }
-    }
-
-    private void drawHeader(DrawContext gfx, int mouseX, int mouseY, double alpha) {
-        double x = contentX() + PADDING;
-        double y = windowY + 13;
-        double boxWidth = contentWidth() - PADDING * 2;
-
-        // No box, no outline at rest — the field is just a slightly lighter patch of the
-        // panel's own glass. Focus is shown with a single thin accent underline rather than a
-        // full border, the same pattern a modern web search field uses.
-        Render2D.roundedRect(gfx, x, y, boxWidth, 20, Theme.radiusSmall(),
-                ColorUtil.fade(Theme.surfaceHigh(), alpha * 0.7));
-        if (searchFocused) {
-            Render2D.rect(gfx, x + 6, y + 19, boxWidth - 12, 1.2,
-                    ColorUtil.fade(Theme.accent(), alpha));
+        // The field is always focused, so the caret is always drawn; it is the only cue that
+        // typing goes here, now that there is no box around it.
+        if ((System.currentTimeMillis() / 530) % 2 == 0) {
+            double caretX = textX + (searchQuery.isEmpty() ? 0 : textRenderer.getWidth(searchQuery) + 2);
+            Render2D.rect(gfx, caretX, panelY + 14, 1, 16,
+                    ColorUtil.fade(ColorUtil.withAlpha(Theme.accent(), 210), alpha));
         }
 
-        String display = searchQuery.isEmpty() && !searchFocused
-                ? "Search modules..."
-                : searchQuery + (searchFocused && (System.currentTimeMillis() / 500) % 2 == 0 ? "_" : "");
-        int textColor = searchQuery.isEmpty() && !searchFocused ? Theme.textMuted() : Theme.textPrimary();
-        Render2D.text(gfx, textRenderer, display, x + 7, y + 6, ColorUtil.fade(textColor, alpha));
+        int count = visibleModules().size();
+        Render2D.textRight(gfx, textRenderer, Integer.toString(count),
+                panelX + PANEL_WIDTH - PADDING, textY, muted, false);
+
+        Render2D.rect(gfx, panelX + PADDING, panelY + SEARCH_HEIGHT, PANEL_WIDTH - PADDING * 2, 1,
+                ColorUtil.fade(Theme.glassEdge(), alpha));
     }
 
-    private void drawModuleList(DrawContext gfx, int mouseX, int mouseY, double alpha) {
+    private void drawList(DrawContext gfx, int mouseX, int mouseY, double alpha) {
         List<Module> modules = visibleModules();
-        double x = contentX() + PADDING;
-        double width = listWidth() - PADDING * 1.5;
-        double top = listTop() + 6;
-        double bottom = listBottom();
+        cursor = MathUtil.clamp(cursor, 0, Math.max(0, modules.size() - 1));
 
-        clampListScroll(modules.size(), bottom - top);
-
-        Render2D.pushScissor(gfx, contentX(), top, listWidth(), bottom - top);
-        double y = top - listScroll;
-
-        for (Module module : modules) {
-            if (y + MODULE_ROW_HEIGHT >= top && y <= bottom) {
-                drawModuleRow(gfx, module, x, y, width, mouseX, mouseY, alpha);
-            }
-            y += MODULE_ROW_HEIGHT + 4;
-        }
+        Render2D.pushScissor(gfx, panelX, listTop(), PANEL_WIDTH, listBottom() - listTop());
 
         if (modules.isEmpty()) {
             Render2D.textCentered(gfx, textRenderer, "No modules match that search",
-                    contentX() + listWidth() / 2.0, top + 20,
+                    panelX + PANEL_WIDTH / 2.0, listTop() + 24,
                     ColorUtil.fade(Theme.textMuted(), alpha), false);
         }
+
+        double lastY = listTop();
+        for (int i = 0; i < modules.size(); i++) {
+            Module module = modules.get(i);
+            double y = rowY(modules, i);
+            lastY = y + ROW_HEIGHT;
+
+            // Skip rows scrolled fully out of view, but keep walking so later ones land right.
+            if (y + ROW_HEIGHT >= listTop() - 4 && y <= listBottom() + 4) {
+                drawRow(gfx, module, y, i, mouseX, mouseY, alpha);
+            }
+            if (module == expanded) {
+                double settingsTop = y + ROW_HEIGHT;
+                drawSettings(gfx, module, settingsTop, mouseX, mouseY);
+                lastY = settingsTop + settingsHeight(module);
+            }
+        }
+
         Render2D.popScissor(gfx);
+        contentHeight = lastY + scroll - listTop();
     }
 
-    private void drawModuleRow(DrawContext gfx, Module module, double x, double y, double width,
-                               int mouseX, int mouseY, double alpha) {
-        boolean hovered = MathUtil.within(mouseX, mouseY, x, y, x + width, y + MODULE_ROW_HEIGHT);
-        boolean selected = module == selectedModule;
+    private void drawRow(DrawContext gfx, Module module, double y, int index,
+                         int mouseX, int mouseY, double alpha) {
+        boolean hovered = MathUtil.within(mouseX, mouseY, panelX, y, panelX + PANEL_WIDTH, y + ROW_HEIGHT);
+        boolean isCursor = index == cursor;
+        boolean isExpanded = module == expanded;
 
-        Animation hover = hoverOf(module);
-        hover.toBoolean(hovered || selected);
-        Animation toggle = toggleOf(module);
-        toggle.toBoolean(module.isEnabled());
+        Animation highlight = highlightOf(module);
+        highlight.toBoolean(hovered || isCursor || isExpanded);
 
-        // Rows sit directly on the panel's own glass at rest — no card behind every one of
-        // them — and only pick up a soft tint on hover or selection. A background box on
-        // every row regardless of state is exactly the boxy look a flat list should avoid.
-        if (hover.value() > 0.01) {
-            int tint = selected ? ColorUtil.withAlpha(Theme.accent(), 30) : Theme.surfaceHover();
-            Render2D.roundedRect(gfx, x, y, width, MODULE_ROW_HEIGHT, Theme.radiusSmall(),
-                    ColorUtil.fade(tint, hover.value() * alpha));
+        if (highlight.value() > 0.01) {
+            int tint = (isCursor || isExpanded)
+                    ? ColorUtil.withAlpha(Theme.accent(), 28)
+                    : Theme.surfaceHover();
+            Render2D.roundedRect(gfx, panelX + 6, y, PANEL_WIDTH - 12, ROW_HEIGHT,
+                    Theme.radiusSmall(), ColorUtil.fade(tint, highlight.value() * alpha));
+        }
+        if (isCursor || isExpanded) {
+            Render2D.roundedRect(gfx, panelX + 6, y + 8, 2.5, ROW_HEIGHT - 16, 1.25,
+                    ColorUtil.fade(Theme.accent(), alpha));
         }
 
-        // Enabled state reads as a filled accent bar on the leading edge — the only boundary
-        // this row draws, and it doubles as the selection marker.
-        double barAlpha = Math.max(toggle.value(), selected ? 0.5 : 0.0);
-        if (barAlpha > 0.01) {
-            Render2D.roundedRect(gfx, x, y + 6, 3, MODULE_ROW_HEIGHT - 12, 1.5,
-                    ColorUtil.fade(Theme.accent(), barAlpha * alpha));
-        }
+        double textY = y + (ROW_HEIGHT - textRenderer.fontHeight) / 2.0;
+        double dotX = panelX + PANEL_WIDTH - PADDING - 4;
 
-        double textX = x + 11;
-        double nameWidth = width - 52;
-        Render2D.text(gfx, textRenderer, Render2D.truncate(textRenderer, module.getName(), (int) nameWidth),
-                textX, y + 6, ColorUtil.fade(Theme.textPrimary(), alpha));
-        Render2D.text(gfx, textRenderer, Render2D.truncate(textRenderer, module.getDescription(), (int) nameWidth),
-                textX, y + 18, ColorUtil.fade(Theme.textMuted(), alpha));
+        String category = module.getCategory().displayName();
+        double categoryRight = dotX - 14;
+        double nameBudget = categoryRight - (panelX + PADDING + 4) - textRenderer.getWidth(category) - 12;
 
-        if (module.isPermanent()) {
-            Render2D.textRight(gfx, textRenderer, "always on", x + width - 10, y + 12,
-                    ColorUtil.fade(Theme.textMuted(), alpha), false);
-        } else {
-            drawSmallToggle(gfx, x + width - 36, y + (MODULE_ROW_HEIGHT - TOGGLE_HEIGHT) / 2.0,
-                    toggle.value(), alpha);
-        }
+        Render2D.text(gfx, textRenderer,
+                Render2D.truncate(textRenderer, module.getName(), (int) nameBudget),
+                panelX + PADDING + 4, textY,
+                ColorUtil.fade(module.isEnabled() ? Theme.textPrimary() : Theme.textSecondary(), alpha));
+
+        Render2D.textRight(gfx, textRenderer, category, categoryRight, textY,
+                ColorUtil.fade(Theme.textMuted(), alpha), false);
+
+        // State is a dot, not a switch. Thirty switches in a column is a wall of controls;
+        // a dot reads as status, and the row itself is the control.
+        int dot = module.isEnabled()
+                ? Theme.accent()
+                : ColorUtil.withAlpha(Theme.textMuted(), module.isPermanent() ? 40 : 95);
+        Render2D.circle(gfx, dotX, y + ROW_HEIGHT / 2.0, 3.2, ColorUtil.fade(dot, alpha));
     }
 
-    private static final double TOGGLE_WIDTH = 26;
-    private static final double TOGGLE_HEIGHT = 14;
+    private void drawSettings(DrawContext gfx, Module module, double top, int mouseX, int mouseY) {
+        double x = panelX + PADDING + 14;
+        double innerWidth = PANEL_WIDTH - PADDING * 2 - 18;
+        double y = top + 4;
 
-    /**
-     * The pill-and-knob switch used everywhere in this client.
-     *
-     * <p>The knob is a rounded square rather than a bare circle, sized a couple of pixels
-     * larger than the tightest fit it could get away with. A perfect circle at a 5px radius
-     * has only five scanlines of vertical resolution to describe a curve with, and no amount
-     * of edge anti-aliasing makes that read as smooth — it needs more pixels to work with,
-     * not a cleverer edge. This one gets them.
-     */
-    private void drawSmallToggle(DrawContext gfx, double x, double y, double t, double alpha) {
-        // The on-state accent is dimmed to ~72%. At full strength a row of switched-on
-        // toggles is the loudest thing on screen, which puts the emphasis on the control
-        // rather than on the module names the list exists to show.
-        int on = ColorUtil.withAlpha(Theme.accent(), 184);
-        int track = ColorUtil.mix(Theme.trackOff(), on, t);
-        Render2D.roundedRect(gfx, x, y, TOGGLE_WIDTH, TOGGLE_HEIGHT, TOGGLE_HEIGHT / 2.0,
-                ColorUtil.fade(track, alpha));
+        SettingRenderer.render(gfx, textRenderer, module.getKeybind(), x, y, innerWidth, mouseX, mouseY);
+        y += SettingRenderer.ROW_HEIGHT + SettingRenderer.extraHeight(module.getKeybind(), textRenderer);
 
-        double knobSize = TOGGLE_HEIGHT - 4;
-        double travel = TOGGLE_WIDTH - TOGGLE_HEIGHT;
-        double knobX = x + 2 + travel * t;
-        Render2D.roundedRect(gfx, knobX, y + 2, knobSize, knobSize, knobSize / 2.0,
-                ColorUtil.fade(ColorUtil.mix(0xFFCFD6E4, 0xFFFFFFFF, t), alpha));
-    }
-
-    private void drawSettingsPanel(DrawContext gfx, int mouseX, int mouseY, double alpha) {
-        double x = settingsX();
-        double width = settingsWidth();
-        double top = listTop();
-        double bottom = listBottom();
-
-        // No divider rule between the list and this panel. The gutter between the two columns
-        // already separates them, and a hard line down the middle was the single most
-        // box-like thing left in the window.
-
-        if (selectedModule == null) {
-            Render2D.textCentered(gfx, textRenderer, "Select a module", x + width / 2.0,
-                    top + (bottom - top) / 2.0 - 4, ColorUtil.fade(Theme.textMuted(), alpha), false);
-            return;
-        }
-
-        double innerX = x + PADDING;
-        double innerWidth = width - PADDING * 2;
-
-        Render2D.pushScissor(gfx, x + 1, top, width - 1, bottom - top);
-        double y = top + 8 - settingsScroll;
-
-        Render2D.text(gfx, textRenderer, Render2D.truncate(textRenderer, selectedModule.getName(), (int) innerWidth),
-                innerX, y, ColorUtil.fade(Theme.textPrimary(), alpha));
-        y += textRenderer.fontHeight + 2;
-        Render2D.text(gfx, textRenderer, Render2D.truncate(textRenderer, selectedModule.getDescription(), (int) innerWidth),
-                innerX, y, ColorUtil.fade(Theme.textMuted(), alpha));
-        y += textRenderer.fontHeight + 8;
-
-        Render2D.separator(gfx, innerX, y, innerWidth, ColorUtil.fade(Theme.border(), alpha));
-        y = settingsFirstRowY();
-
-        // Keybind row first: it is the one control every module has.
-        SettingRenderer.render(gfx, textRenderer, selectedModule.getKeybind(), innerX, y, innerWidth, mouseX, mouseY);
-        y += SettingRenderer.ROW_HEIGHT;
-
-        for (Setting<?> setting : selectedModule.getVisibleSettings()) {
-            SettingRenderer.render(gfx, textRenderer, setting, innerX, y, innerWidth, mouseX, mouseY);
+        for (Setting<?> setting : module.getVisibleSettings()) {
+            SettingRenderer.render(gfx, textRenderer, setting, x, y, innerWidth, mouseX, mouseY);
             y += SettingRenderer.ROW_HEIGHT + SettingRenderer.extraHeight(setting, textRenderer);
         }
-
-        Render2D.popScissor(gfx);
     }
 
-    private void drawFooter(DrawContext gfx, double alpha) {
-        double y = windowY + WINDOW_HEIGHT - FOOTER_HEIGHT;
-        Render2D.separator(gfx, contentX(), y, contentWidth(), ColorUtil.fade(Theme.border(), alpha));
+    private void drawHint(DrawContext gfx, double alpha) {
+        double y = panelY + PANEL_HEIGHT - HINT_HEIGHT;
+        Render2D.rect(gfx, panelX + PADDING, y, PANEL_WIDTH - PADDING * 2, 1,
+                ColorUtil.fade(Theme.glassEdge(), alpha * 0.6));
 
-        // Under Performance, show what the machine is doing rather than the profile name —
-        // that is the context a player needs while changing these settings.
-        String left = selectedCategory == ModuleCategory.PERFORMANCE && searchQuery.isBlank()
-                ? SystemProfile.detectTier() + " tier  ·  " + SystemProfile.cpuThreads() + " threads"
-                : GadzoClient.modules().enabledCount() + " enabled  ·  profile: "
-                        + ConfigManager.activeProfile();
-
-        Render2D.text(gfx, textRenderer, Render2D.truncate(textRenderer, left, (int) (contentWidth() - 90)),
-                contentX() + PADDING, y + 9, ColorUtil.fade(Theme.textMuted(), alpha));
-        Render2D.textRight(gfx, textRenderer, "v" + GadzoClient.VERSION,
-                windowX + WINDOW_WIDTH - PADDING, y + 9,
+        double textY = y + (HINT_HEIGHT - textRenderer.fontHeight) / 2.0 + 1;
+        Render2D.text(gfx, textRenderer, "enter toggle    tab settings    esc close",
+                panelX + PADDING, textY, ColorUtil.fade(Theme.textMuted(), alpha));
+        Render2D.textRight(gfx, textRenderer,
+                GadzoClient.modules().enabledCount() + " on",
+                panelX + PANEL_WIDTH - PADDING, textY,
                 ColorUtil.fade(Theme.textMuted(), alpha), false);
     }
 
-    private void clampListScroll(int count, double viewportHeight) {
-        double contentHeight = count * (MODULE_ROW_HEIGHT + 4);
-        double max = Math.max(0, contentHeight - viewportHeight);
-        listScroll = MathUtil.clamp(listScroll, 0, max);
-    }
-
-    // -- input ---------------------------------------------------------------------------------
+    // -- input ----------------------------------------------------------------------------
 
     @Override
     public boolean mouseClicked(double clickX, double clickY, int button) {
-        double mouseX = clickX;
-        double mouseY = clickY;
+        List<Module> modules = visibleModules();
 
-        // Search box.
-        double searchX = contentX() + PADDING;
-        double searchY = windowY + 13;
-        double searchWidth = contentWidth() - PADDING * 2;
-        searchFocused = MathUtil.within(mouseX, mouseY, searchX, searchY,
-                searchX + searchWidth, searchY + 20);
-        if (searchFocused) {
-            return true;
+        // An expanded module's settings get first refusal: a dropdown or colour picker can
+        // extend over the rows beneath it and has to consume the click before they do.
+        if (expanded != null) {
+            double settingsX = panelX + PADDING + 14;
+            double innerWidth = PANEL_WIDTH - PADDING * 2 - 18;
+            int index = modules.indexOf(expanded);
+            if (index >= 0) {
+                double y = rowY(modules, index) + ROW_HEIGHT + 4;
+
+                if (SettingRenderer.mouseClicked(expanded.getKeybind(), textRenderer, settingsX, y,
+                        innerWidth, clickX, clickY, button)) {
+                    return true;
+                }
+                y += SettingRenderer.ROW_HEIGHT
+                        + SettingRenderer.extraHeight(expanded.getKeybind(), textRenderer);
+
+                for (Setting<?> setting : expanded.getVisibleSettings()) {
+                    if (SettingRenderer.mouseClicked(setting, textRenderer, settingsX, y,
+                            innerWidth, clickX, clickY, button)) {
+                        return true;
+                    }
+                    y += SettingRenderer.ROW_HEIGHT
+                            + SettingRenderer.extraHeight(setting, textRenderer);
+                }
+            }
         }
 
-        if (handleSettingsClick(mouseX, mouseY, button)) {
-            return true;
-        }
-        // A click outside an open popup closes it rather than falling through.
-        if (SettingRenderer.openDropdown() != null || SettingRenderer.openPicker() != null) {
-            SettingRenderer.closePopups();
-            return true;
-        }
-        if (handleSidebarClick(mouseX, mouseY)) {
-            return true;
-        }
-        if (handleModuleListClick(mouseX, mouseY, button)) {
+        for (int i = 0; i < modules.size(); i++) {
+            double y = rowY(modules, i);
+            if (!MathUtil.within(clickX, clickY, panelX, y, panelX + PANEL_WIDTH, y + ROW_HEIGHT)) {
+                continue;
+            }
+            Module module = modules.get(i);
+            cursor = i;
+            if (button == 1) {
+                toggleExpanded(module);
+            } else {
+                module.toggle();
+            }
             return true;
         }
         return super.mouseClicked(clickX, clickY, button);
     }
 
-    private boolean handleSidebarClick(double mouseX, double mouseY) {
-        double y = windowY + HEADER_HEIGHT;
-        for (ModuleCategory category : ModuleCategory.values()) {
-            if (MathUtil.within(mouseX, mouseY, windowX + 6, y, windowX + SIDEBAR_WIDTH - 6, y + 28)) {
-                selectedCategory = category;
-                searchQuery = "";
-                listScroll = 0;
-                return true;
-            }
-            y += 30;
-        }
-        return false;
-    }
-
-    private boolean handleModuleListClick(double mouseX, double mouseY, int button) {
-        if (!MathUtil.within(mouseX, mouseY, contentX(), listTop(), contentX() + listWidth(), listBottom())) {
-            return false;
-        }
-        double x = contentX() + PADDING;
-        double width = listWidth() - PADDING * 1.5;
-        double y = listTop() + 6 - listScroll;
-
-        for (Module module : visibleModules()) {
-            if (MathUtil.within(mouseX, mouseY, x, y, x + width, y + MODULE_ROW_HEIGHT)) {
-                // Right side of the row toggles; the rest selects it for editing.
-                boolean onToggle = mouseX >= x + width - 40 && !module.isPermanent();
-                if (onToggle || button == 1) {
-                    module.toggle();
-                } else {
-                    selectedModule = module;
-                    settingsScroll = 0;
-                }
-                return true;
-            }
-            y += MODULE_ROW_HEIGHT + 4;
-        }
-        return true;
-    }
-
-    private boolean handleSettingsClick(double mouseX, double mouseY, int button) {
-        if (selectedModule == null) {
-            return false;
-        }
-        double innerX = settingsX() + PADDING;
-        double innerWidth = settingsWidth() - PADDING * 2;
-        double y = settingsFirstRowY();
-
-        if (SettingRenderer.mouseClicked(selectedModule.getKeybind(), textRenderer, innerX, y, innerWidth,
-                mouseX, mouseY, button)) {
-            return true;
-        }
-        y += SettingRenderer.ROW_HEIGHT;
-
-        for (Setting<?> setting : selectedModule.getVisibleSettings()) {
-            if (SettingRenderer.mouseClicked(setting, textRenderer, innerX, y, innerWidth, mouseX, mouseY, button)) {
-                return true;
-            }
-            y += SettingRenderer.ROW_HEIGHT + SettingRenderer.extraHeight(setting, textRenderer);
-        }
-        return false;
+    private void toggleExpanded(Module module) {
+        SettingRenderer.closePopups();
+        expanded = expanded == module ? null : module;
     }
 
     @Override
     public boolean mouseDragged(double clickX, double clickY, int button, double deltaX, double deltaY) {
         if (SettingRenderer.isDragging()) {
-            SettingRenderer.mouseDragged(settingsX() + PADDING, settingsWidth() - PADDING * 2,
+            SettingRenderer.mouseDragged(panelX + PADDING + 14, PANEL_WIDTH - PADDING * 2 - 18,
                     clickX, clickY);
             return true;
         }
@@ -541,43 +391,89 @@ public class ClickGuiScreen extends Screen {
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double vertical) {
-        double amount = vertical * 18;
-        if (mouseX >= settingsX()) {
-            settingsScroll = Math.max(0, settingsScroll - amount);
-        } else {
-            listScroll = Math.max(0, listScroll - amount);
-        }
+        double viewport = listBottom() - listTop();
+        double max = Math.max(0, contentHeight - viewport + 12);
+        scroll = MathUtil.clamp(scroll - vertical * 22, 0, max);
         return true;
+    }
+
+    /** Keeps the keyboard cursor inside the viewport after an arrow-key move. */
+    private void scrollToCursor() {
+        List<Module> modules = visibleModules();
+        if (modules.isEmpty()) {
+            return;
+        }
+        double y = rowY(modules, cursor);
+        if (y < listTop() + 4) {
+            scroll -= (listTop() + 4) - y;
+        } else if (y + ROW_HEIGHT > listBottom() - 4) {
+            scroll += (y + ROW_HEIGHT) - (listBottom() - 4);
+        }
+        scroll = Math.max(0, scroll);
     }
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
         // A listening keybind row swallows every key, including escape, so it can be cleared.
-        if (selectedModule != null) {
-            if (SettingRenderer.keyPressed(selectedModule.getKeybind(), keyCode)) {
+        if (expanded != null) {
+            if (SettingRenderer.keyPressed(expanded.getKeybind(), keyCode)) {
                 return true;
             }
-            for (Setting<?> setting : selectedModule.getVisibleSettings()) {
+            for (Setting<?> setting : expanded.getVisibleSettings()) {
                 if (SettingRenderer.keyPressed(setting, keyCode)) {
                     return true;
                 }
             }
         }
 
-        if (searchFocused) {
-            if (keyCode == GLFW.GLFW_KEY_BACKSPACE) {
-                if (!searchQuery.isEmpty()) {
-                    searchQuery = searchQuery.substring(0, searchQuery.length() - 1);
+        List<Module> modules = visibleModules();
+        switch (keyCode) {
+            case GLFW.GLFW_KEY_DOWN -> {
+                cursor = Math.min(cursor + 1, Math.max(0, modules.size() - 1));
+                scrollToCursor();
+                return true;
+            }
+            case GLFW.GLFW_KEY_UP -> {
+                cursor = Math.max(0, cursor - 1);
+                scrollToCursor();
+                return true;
+            }
+            case GLFW.GLFW_KEY_ENTER, GLFW.GLFW_KEY_KP_ENTER -> {
+                if (cursor < modules.size()) {
+                    modules.get(cursor).toggle();
                 }
                 return true;
             }
-            if (keyCode == GLFW.GLFW_KEY_ESCAPE) {
-                if (!searchQuery.isEmpty()) {
-                    searchQuery = "";
-                } else {
-                    searchFocused = false;
+            case GLFW.GLFW_KEY_TAB -> {
+                if (cursor < modules.size()) {
+                    toggleExpanded(modules.get(cursor));
                 }
                 return true;
+            }
+            case GLFW.GLFW_KEY_BACKSPACE -> {
+                if (!searchQuery.isEmpty()) {
+                    searchQuery = searchQuery.substring(0, searchQuery.length() - 1);
+                    cursor = 0;
+                    scroll = 0;
+                }
+                return true;
+            }
+            case GLFW.GLFW_KEY_ESCAPE -> {
+                // Escape backs out one layer at a time rather than closing outright: clear the
+                // search, then collapse the expanded row, then close.
+                if (!searchQuery.isEmpty()) {
+                    searchQuery = "";
+                    cursor = 0;
+                    scroll = 0;
+                    return true;
+                }
+                if (expanded != null) {
+                    toggleExpanded(expanded);
+                    return true;
+                }
+            }
+            default -> {
+                // Fall through to the superclass for anything unhandled.
             }
         }
         return super.keyPressed(keyCode, scanCode, modifiers);
@@ -585,12 +481,11 @@ public class ClickGuiScreen extends Screen {
 
     @Override
     public boolean charTyped(char chr, int modifiers) {
-        if (searchFocused) {
-            searchQuery += String.valueOf(chr);
-            listScroll = 0;
-            return true;
-        }
-        return super.charTyped(chr, modifiers);
+        // No focus to manage: the search field owns typing whenever the palette is open.
+        searchQuery += chr;
+        cursor = 0;
+        scroll = 0;
+        return true;
     }
 
     @Override
