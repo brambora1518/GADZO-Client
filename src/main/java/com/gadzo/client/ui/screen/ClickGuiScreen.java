@@ -331,8 +331,8 @@ public class ClickGuiScreen extends Screen {
         }
     }
 
-    private static final double TOGGLE_WIDTH = 30;
-    private static final double TOGGLE_HEIGHT = 16;
+    private static final double TOGGLE_WIDTH = 26;
+    private static final double TOGGLE_HEIGHT = 14;
 
     /**
      * The pill-and-knob switch used everywhere in this client.
@@ -344,7 +344,11 @@ public class ClickGuiScreen extends Screen {
      * not a cleverer edge. This one gets them.
      */
     private void drawSmallToggle(DrawContext gfx, double x, double y, double t, double alpha) {
-        int track = ColorUtil.mix(Theme.trackOff(), Theme.accent(), t);
+        // The on-state accent is dimmed to ~72%. At full strength a row of switched-on
+        // toggles is the loudest thing on screen, which puts the emphasis on the control
+        // rather than on the module names the list exists to show.
+        int on = ColorUtil.withAlpha(Theme.accent(), 184);
+        int track = ColorUtil.mix(Theme.trackOff(), on, t);
         Render2D.roundedRect(gfx, x, y, TOGGLE_WIDTH, TOGGLE_HEIGHT, TOGGLE_HEIGHT / 2.0,
                 ColorUtil.fade(track, alpha));
 
@@ -352,7 +356,7 @@ public class ClickGuiScreen extends Screen {
         double travel = TOGGLE_WIDTH - TOGGLE_HEIGHT;
         double knobX = x + 2 + travel * t;
         Render2D.roundedRect(gfx, knobX, y + 2, knobSize, knobSize, knobSize / 2.0,
-                ColorUtil.fade(0xFFF4F6FA, alpha));
+                ColorUtil.fade(ColorUtil.mix(0xFFCFD6E4, 0xFFFFFFFF, t), alpha));
     }
 
     private void drawSettingsPanel(DrawContext gfx, int mouseX, int mouseY, double alpha) {
@@ -361,7 +365,9 @@ public class ClickGuiScreen extends Screen {
         double top = listTop();
         double bottom = listBottom();
 
-        Render2D.rect(gfx, x, top, 1, bottom - top, ColorUtil.fade(Theme.border(), alpha));
+        // No divider rule between the list and this panel. The gutter between the two columns
+        // already separates them, and a hard line down the middle was the single most
+        // box-like thing left in the window.
 
         if (selectedModule == null) {
             Render2D.textCentered(gfx, textRenderer, "Select a module", x + width / 2.0,

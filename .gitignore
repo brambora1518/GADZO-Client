@@ -39,3 +39,6 @@ replay_*.log
 *.hprof
 *.jfr
 .port-reference/
+
+# UI preview output
+tools/uipreview/*.png

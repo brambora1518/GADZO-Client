@@ -193,12 +193,18 @@ public final class Theme {
         };
     }
 
-    /** Subtle fill for hovered rows. */
+    /**
+     * Fill for a hovered row.
+     *
+     * <p>Deliberately near the threshold of visibility. Hover is feedback, not decoration —
+     * once it is bright enough to read as a filled box it competes with the selected row for
+     * attention and the list stops having an obvious focus.
+     */
     public static int surfaceHover() {
         return switch (appearance) {
-            case DARK -> 0x50FFFFFF;
-            case MIDNIGHT -> 0x48FFFFFF;
-            case LIGHT -> 0x30101828;
+            case DARK -> 0x16FFFFFF;
+            case MIDNIGHT -> 0x14FFFFFF;
+            case LIGHT -> 0x12101828;
         };
     }
 
@@ -243,9 +249,14 @@ public final class Theme {
         return appearance == Appearance.LIGHT ? 0xFF8C93A1 : 0xFF636E82;
     }
 
-    /** Fill for a control that is switched off. */
+    /**
+     * Fill for a control that is switched off.
+     *
+     * <p>Translucent rather than a solid slab, so an off switch sits on the glass like
+     * everything else instead of punching an opaque hole through it.
+     */
     public static int trackOff() {
-        return appearance == Appearance.LIGHT ? 0xFFC9CFDC : 0xFF2C3546;
+        return appearance == Appearance.LIGHT ? 0x33101828 : 0x2EFFFFFF;
     }
 
     public static int success() {

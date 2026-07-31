@@ -28,12 +28,13 @@ import java.util.Map;
  */
 public final class SettingRenderer {
 
-    public static final double ROW_HEIGHT = 24.0;
-    private static final double TOGGLE_WIDTH = 32.0;
-    private static final double TOGGLE_HEIGHT = 18.0;
-    private static final double SLIDER_HEIGHT = 4.0;
-    private static final double SLIDER_KNOB = 10.0;
-    private static final double SWATCH_SIZE = 15.0;
+    /** Roomier than it needs to be for the text alone; a slider row has to fit under it too. */
+    public static final double ROW_HEIGHT = 28.0;
+    private static final double TOGGLE_WIDTH = 26.0;
+    private static final double TOGGLE_HEIGHT = 14.0;
+    private static final double SLIDER_HEIGHT = 3.0;
+    private static final double SLIDER_KNOB = 9.0;
+    private static final double SWATCH_SIZE = 14.0;
 
     private static final Map<Setting<?>, Animation> HOVER = new HashMap<>();
     private static final Map<Setting<?>, Animation> TOGGLE = new HashMap<>();
@@ -154,13 +155,17 @@ public final class SettingRenderer {
         animation.toBoolean(setting.get());
         double t = animation.value();
 
-        int track = ColorUtil.mix(Theme.trackOff(), Theme.accent(), t);
+        // Accent dimmed to ~72% for the same reason as the module list's switches: at full
+        // strength they are louder than the setting names beside them.
+        int on = ColorUtil.withAlpha(Theme.accent(), 184);
+        int track = ColorUtil.mix(Theme.trackOff(), on, t);
         Render2D.roundedRect(gfx, x, y, TOGGLE_WIDTH, TOGGLE_HEIGHT, TOGGLE_HEIGHT / 2.0, track);
 
         double knobSize = TOGGLE_HEIGHT - 4;
         double travel = TOGGLE_WIDTH - TOGGLE_HEIGHT;
         double knobX = x + 2 + travel * t;
-        Render2D.roundedRect(gfx, knobX, y + 2, knobSize, knobSize, knobSize / 2.0, 0xFFF4F6FA);
+        Render2D.roundedRect(gfx, knobX, y + 2, knobSize, knobSize, knobSize / 2.0,
+                ColorUtil.mix(0xFFCFD6E4, 0xFFFFFFFF, t));
     }
 
     private static void renderSlider(DrawContext gfx, TextRenderer font, NumberSetting setting,
@@ -168,12 +173,15 @@ public final class SettingRenderer {
         String value = setting.display();
         Render2D.textRight(gfx, font, value, x + width, y + 3, Theme.textPrimary(), false);
 
-        double trackY = y + ROW_HEIGHT - 7;
+        // Sits a little above the row's bottom edge so consecutive sliders have visible air
+        // between one track and the next label, rather than running together into a grid.
+        double trackY = y + ROW_HEIGHT - 9;
         Render2D.roundedRect(gfx, x, trackY, width, SLIDER_HEIGHT, SLIDER_HEIGHT / 2.0, Theme.trackOff());
 
         double filled = width * setting.asFraction();
         if (filled > 0.5) {
-            Render2D.roundedRect(gfx, x, trackY, filled, SLIDER_HEIGHT, SLIDER_HEIGHT / 2.0, Theme.accent());
+            Render2D.roundedRect(gfx, x, trackY, filled, SLIDER_HEIGHT, SLIDER_HEIGHT / 2.0,
+                    ColorUtil.withAlpha(Theme.accent(), 200));
         }
         // Same reasoning as the toggle knob above: a rounded square reads cleaner than a bare
         // circle this small.
