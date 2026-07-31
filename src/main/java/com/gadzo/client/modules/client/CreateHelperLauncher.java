@@ -8,19 +8,17 @@ import com.gadzo.client.util.Mc;
 import org.lwjgl.glfw.GLFW;
 
 /**
- * Opens the Create reference and stress planner.
+ * Opens the Create reference, stress planner and gear-ratio solver.
  *
- * <p>Create has no build for MinecraftClient 26.2 — Forge/NeoForge stops at 1.21.1 and the Fabric
- * port at 1.20.1 — so this is a planning tool rather than a live overlay. It is still worth
- * having in the client: the stress calculator answers "how many water wheels does this need"
- * without a spreadsheet, and the reference covers the parts of Create that trip people up
- * regardless of version.
+ * <p>Useful with or without Create installed. With it, the stress figures come out of Create's
+ * own registry; without it, the planner falls back to built-in defaults so a contraption can be
+ * costed before the mod is even in the pack.
  */
 public class CreateHelperLauncher extends Module {
 
     public CreateHelperLauncher() {
-        super("Create helper", "Reference and stress planner for the Create mod",
-                ModuleCategory.CLIENT);
+        super("Create helper", "Reference, stress planner and gear ratios for Create",
+                ModuleCategory.CREATE);
         markPermanent();
         getKeybind().setValue(GLFW.GLFW_KEY_G);
     }

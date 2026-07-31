@@ -7,6 +7,8 @@ public enum ModuleCategory {
     VISUAL("Visual", "Look and feel of the world and interface"),
     COMBAT("Combat", "Client-side combat readouts"),
     MOVEMENT("Movement", "Sprint, sneak and camera helpers"),
+    SURVIVAL("Survival", "Waypoints, light, food and gear warnings"),
+    CREATE("Create", "Live readouts for Create kinetic networks"),
     CLIENT("Client", "GADZO itself — theme, menus and config");
 
     private final String displayName;

@@ -86,27 +86,72 @@ an already-averaged number, and the 1% low figure says the same thing numericall
 for a configurable grace period after it leaves the crosshair, because in a fight the camera
 rarely stays on the opponent and a panel that vanished instantly would just flicker.
 
-### Create helper
+### Survival
 
-Press **G**. A reference and stress planner for the [Create](https://modrinth.com/mod/create)
-mod.
+| Module | What it does |
+| --- | --- |
+| **Waypoints** | Mark a place and find it again. Wireframe beam plus a floating label with the distance. `N` drops one where you stand. |
+| **Compass** | A heading strip with waypoint bearings marked on it. Markers behind you are pinned to the edge with an arrow rather than dropped. |
+| **Death point** | Records where you died as a waypoint, automatically, and tells you how far back it is once you respawn. |
+| **Light level** | Block light, sky light, and whether hostile mobs can spawn where you are standing. |
+| **Food** | Hunger *and saturation* — the hidden value that decides how long you stay fed and whether you regenerate. |
+| **Experience** | Level, points to the next one, and levels remaining before an enchanting table offers its best tier. |
+| **Durability** | Everything worn or held that is close to breaking, sorted by what breaks first. |
+| **Survival alerts** | Low health, drowning, hunger and gear warnings — fired on a threshold being *crossed*, not while it is true. |
 
-**Create has no build for Minecraft 26.2** — the Forge/NeoForge project stops at 1.21.1 and the
-Fabric port at 1.20.1 — so this cannot read a live kinetic network. It is a planning tool, and
-the stress calculator is the part that earns its keep: pick your machines, and it tells you the
-per-RPM load and how many water wheels, windmills or steam engines cover it. That is otherwise
-a spreadsheet job.
+Waypoints are stored per world, in their own file, deliberately outside the profile system:
+switching from a PvP layout to a building layout should not lose the way home.
 
-The reference is weighted towards things that do not change between Create versions: how stress
-arithmetic works, gear ratios, belt rules, and the order to diagnose a stopped contraption in.
-Numeric impact values drift between releases, so they are marked as 0.5.x figures and every
-entry that leans on them points at the Engineer's Goggles, which are always authoritative for
-the build in front of you.
+The beam is depth-tested and the label is not. A beam that punched through terrain would be a
+wall-hack in everything but name; a label floating over a hill is the same information a
+compass gives — a direction and a distance.
 
-The single most valuable thing in it is also the simplest: **speed does not buy stress
-headroom.** Impact and capacity are both per-RPM, so running a network faster raises
-consumption and capacity by exactly the same factor. If you are overstressed, you need more
-generators or fewer machines — gearing up changes nothing.
+### Survival helper
+
+Press **H**. Four tabs, three of them live rather than static text:
+
+- **Waypoints** — the real list. Click to show or hide, right-click to delete.
+- **Nether calculator** — converts the position you are standing in, and every waypoint. The
+  Y axis is deliberately never divided by 8; doing so is the mistake that puts portals in the
+  lava sea.
+- **Food table** — every edible item in your game, built from the item registry so modded food
+  appears too, ranked by saturation rather than by hunger restored.
+- **Reference** — mob spawning, ore heights, enchanting, the anvil's prior-work penalty, and
+  brewing. Weighted towards rules that changed and whose old versions are still repeated:
+  hostile mobs have needed light level **0**, not 7, since 1.18.
+
+### Create
+
+Press **G** for the reference, stress planner and gear-ratio solver.
+
+With [Create](https://modrinth.com/mod/create-fabric) installed, the client reads it directly:
+
+**Kinetic readout** — look at any kinetic block and get its speed, the network's stress against
+its capacity as a bar, network size, and one line naming the problem when there is one. This is
+the Engineer's Goggles readout without the goggles, and it reads the same fields the goggles do
+— Create syncs a network's stress to every client that can see one of its blocks.
+
+**Stress alert** — warns *before* a network stalls. A network at 90% has room for nothing, and
+the next press will take it down; being told after everything stops is too late.
+
+**Stress planner** — per-block impact and capacity come out of Create's own registry, so a pack
+that retunes stress values stays correct without this client knowing anything about it. With
+Create absent it falls back to built-in figures (Create 6.0.8 defaults, read out of the mod).
+
+**Gear ratios** — the thing this exists to make obvious is that Create's gearing is *binary*.
+Large-to-small doubles, small-to-large halves, and everything else passes speed through
+unchanged, so the only reachable ratios are powers of two. Ask for 45 RPM from 64 and the
+solver says plainly that no cogwheel chain can do it and you need a Rotational Speed Controller
+— rather than offering a near miss.
+
+None of it is a hard dependency. Everything goes through reflection against Create's own class
+names, which the loader does not remap, and the whole bridge latches off with a single log line
+if a future Create moves something.
+
+**The most useful fact in the reference:** gearing a network up buys no stress headroom, because
+impact and capacity both scale with RPM. With one exception, which the reference also covers —
+Create sums each block at *its own* speed, so gearing up only the machines and not the generator
+really does raise the load.
 
 ### Commands
 
@@ -118,7 +163,11 @@ network.
 /gadzo toggle <module>        toggle by loose name match ("ent" finds "Entity culling")
 /gadzo profile                show profiles
 /gadzo profile save|load <n>  manage profiles
-/gadzo hardware               tier, benchmark score, bottleneck, heap advice
+/gadzo hardware               tier, benchmark score, heap advice
+/gadzo wp                     list waypoints in this world
+/gadzo wp add|del|toggle <n>  manage waypoints
+/gadzo wp clear               remove every waypoint here
+/gadzo nether                 convert your position across the portal
 /gadzo save                   write the active profile
 ```
 
@@ -271,3 +320,15 @@ Differences forced by the older API, rather than by choice:
 - **No sky/celestial toggle** in Weather render — only precipitation is skipped.
 
 Toolchain: Loom 1.7.4 (the last line that supports Yarn mappings), Gradle 8.8, Java 17.
+
+### What this branch has that `main` does not
+
+The Survival and Create categories — waypoints, the compass, death points, the light, food,
+experience and durability readouts, the survival alerts, the survival helper screen, and the
+whole live Create integration — exist **only here**. They were built against 1.20.1 because
+that is where Create runs.
+
+Porting them to 26.2 is real work rather than a copy: the world-render hook, the retained-mode
+GUI and the Yarn-to-Mojang mapping change all touch these files, and the Create half would have
+nothing to talk to. If you want the survival half on `main` as well, say so and it can be done
+as its own pass.

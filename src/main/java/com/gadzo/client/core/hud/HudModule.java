@@ -212,6 +212,16 @@ public abstract class HudModule extends Module {
         this.lastWidth = width;
         this.lastHeight = height;
 
+        // An element with nothing to say reports zero content, which still leaves the padding
+        // on both axes — enough for the background plate to draw as a small floating square.
+        // Elements that hide themselves conditionally (Target with no target, Durability with
+        // nothing worn) are common enough that this is worth catching here rather than in each.
+        if (contentWidth(font) <= 0 && contentHeight(font) <= 0) {
+            this.lastWidth = 0;
+            this.lastHeight = 0;
+            return;
+        }
+
         double s = getScale();
         double pad = padding();
 

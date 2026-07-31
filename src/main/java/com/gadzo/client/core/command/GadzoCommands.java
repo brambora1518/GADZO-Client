@@ -6,13 +6,18 @@ import com.gadzo.client.core.module.Module;
 import com.gadzo.client.core.module.ModuleCategory;
 import com.gadzo.client.core.system.CpuBenchmark;
 import com.gadzo.client.core.system.SystemProfile;
+import com.gadzo.client.survival.NetherCalculator;
+import com.gadzo.client.survival.Waypoint;
+import com.gadzo.client.survival.WaypointStore;
 import com.gadzo.client.ui.notify.Notifications;
+import com.gadzo.client.util.Mc;
 
 import com.mojang.brigadier.arguments.StringArgumentType;
 
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback;
 import net.fabricmc.fabric.api.client.command.v2.ClientCommandManager;
 import net.fabricmc.fabric.api.client.command.v2.FabricClientCommandSource;
+import net.minecraft.client.network.ClientPlayerEntity;
 import net.minecraft.util.Formatting;
 import net.minecraft.text.Text;
 
@@ -66,6 +71,29 @@ public final class GadzoCommands {
 
                         .then(ClientCommandManager.literal("hardware")
                                 .executes(ctx -> showHardware(ctx.getSource())))
+
+                        .then(ClientCommandManager.literal("wp")
+                                .executes(ctx -> listWaypoints(ctx.getSource()))
+                                .then(ClientCommandManager.literal("add")
+                                        .then(ClientCommandManager.argument("name",
+                                                        StringArgumentType.greedyString())
+                                                .executes(ctx -> addWaypoint(ctx.getSource(),
+                                                        StringArgumentType.getString(ctx, "name")))))
+                                .then(ClientCommandManager.literal("del")
+                                        .then(ClientCommandManager.argument("name",
+                                                        StringArgumentType.greedyString())
+                                                .executes(ctx -> removeWaypoint(ctx.getSource(),
+                                                        StringArgumentType.getString(ctx, "name")))))
+                                .then(ClientCommandManager.literal("toggle")
+                                        .then(ClientCommandManager.argument("name",
+                                                        StringArgumentType.greedyString())
+                                                .executes(ctx -> toggleWaypoint(ctx.getSource(),
+                                                        StringArgumentType.getString(ctx, "name")))))
+                                .then(ClientCommandManager.literal("clear")
+                                        .executes(ctx -> clearWaypoints(ctx.getSource()))))
+
+                        .then(ClientCommandManager.literal("nether")
+                                .executes(ctx -> convertNether(ctx.getSource())))
 
                         .then(ClientCommandManager.literal("save")
                                 .executes(ctx -> {
@@ -137,7 +165,107 @@ public final class GadzoCommands {
         feedback(source, "  /gadzo profile           — show profiles");
         feedback(source, "  /gadzo profile save|load <name>");
         feedback(source, "  /gadzo hardware          — detected tier and bottleneck");
+        feedback(source, "  /gadzo wp                — list waypoints in this world");
+        feedback(source, "  /gadzo wp add|del|toggle <name>");
+        feedback(source, "  /gadzo wp clear          — remove every waypoint here");
+        feedback(source, "  /gadzo nether            — convert your position across the portal");
         feedback(source, "  /gadzo save              — write the active profile");
+        return 1;
+    }
+
+    // -- waypoints -----------------------------------------------------------------------
+
+    private static int listWaypoints(FabricClientCommandSource source) {
+        List<Waypoint> waypoints = WaypointStore.allInWorld();
+        if (waypoints.isEmpty()) {
+            feedback(source, "No waypoints in this world.");
+            return 1;
+        }
+        ClientPlayerEntity player = Mc.player();
+        String dimension = WaypointStore.currentDimension();
+
+        for (Waypoint waypoint : waypoints) {
+            boolean here = waypoint.dimension().equals(dimension);
+            String suffix = here && player != null
+                    ? String.format("  %.0f m", waypoint.horizontalDistanceTo(player.getPos()))
+                    : "  (" + waypoint.dimension() + ")";
+
+            source.sendFeedback(Text.literal("  " + (waypoint.visible() ? "[on]  " : "[off] "))
+                    .formatted(waypoint.visible() ? Formatting.GREEN : Formatting.DARK_GRAY)
+                    .append(Text.literal(waypoint.name()).formatted(Formatting.WHITE))
+                    .append(Text.literal("  " + waypoint.x() + ", " + waypoint.y() + ", "
+                            + waypoint.z() + suffix).formatted(Formatting.GRAY)));
+        }
+        feedback(source, waypoints.size() + " waypoint(s).");
+        return 1;
+    }
+
+    private static int addWaypoint(FabricClientCommandSource source, String name) {
+        ClientPlayerEntity player = Mc.player();
+        String dimension = WaypointStore.currentDimension();
+        if (player == null || dimension == null) {
+            error(source, "You need to be in a world to place a waypoint.");
+            return 0;
+        }
+        Waypoint waypoint = new Waypoint(name.trim(),
+                (int) Math.floor(player.getX()),
+                (int) Math.floor(player.getY()),
+                (int) Math.floor(player.getZ()),
+                dimension, WaypointStore.DEFAULT_COLOR, true);
+
+        if (!WaypointStore.add(waypoint)) {
+            error(source, "Could not save the waypoint.");
+            return 0;
+        }
+        feedback(source, "Saved '" + waypoint.name() + "' at " + waypoint.x() + ", "
+                + waypoint.y() + ", " + waypoint.z() + ".");
+        return 1;
+    }
+
+    private static int removeWaypoint(FabricClientCommandSource source, String name) {
+        if (!WaypointStore.remove(name)) {
+            error(source, "No waypoint called '" + name + "'.");
+            return 0;
+        }
+        feedback(source, "Deleted '" + name + "'.");
+        return 1;
+    }
+
+    private static int toggleWaypoint(FabricClientCommandSource source, String name) {
+        Waypoint waypoint = WaypointStore.byName(name);
+        if (waypoint == null) {
+            error(source, "No waypoint called '" + name + "'.");
+            return 0;
+        }
+        Waypoint updated = waypoint.withVisible(!waypoint.visible());
+        WaypointStore.replace(updated);
+        feedback(source, updated.name() + " is now "
+                + (updated.visible() ? "visible" : "hidden") + ".");
+        return 1;
+    }
+
+    private static int clearWaypoints(FabricClientCommandSource source) {
+        int removed = WaypointStore.clearCurrentWorld();
+        feedback(source, "Removed " + removed + " waypoint(s) from this world.");
+        return 1;
+    }
+
+    private static int convertNether(FabricClientCommandSource source) {
+        ClientPlayerEntity player = Mc.player();
+        String dimension = WaypointStore.currentDimension();
+        if (player == null || dimension == null) {
+            error(source, "You need to be in a world.");
+            return 0;
+        }
+        boolean inNether = dimension.equals("minecraft:the_nether");
+        int x = (int) Math.floor(player.getX());
+        int z = (int) Math.floor(player.getZ());
+        int cx = inNether ? NetherCalculator.toOverworld(x) : NetherCalculator.toNether(x);
+        int cz = inNether ? NetherCalculator.toOverworld(z) : NetherCalculator.toNether(z);
+
+        feedback(source, (inNether ? "Nether " : "Overworld ") + x + ", " + z
+                + "  →  " + (inNether ? "Overworld " : "Nether ") + cx + ", " + cz);
+        feedback(source, NetherCalculator.describe(x, z, inNether));
         return 1;
     }
 

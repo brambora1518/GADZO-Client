@@ -10,6 +10,9 @@ import com.gadzo.client.modules.client.ClientSettings;
 import com.gadzo.client.modules.client.CreateHelperLauncher;
 import com.gadzo.client.modules.client.HudEditorLauncher;
 import com.gadzo.client.modules.client.MenuLauncher;
+import com.gadzo.client.modules.client.SurvivalHelperLauncher;
+import com.gadzo.client.modules.create.KineticHud;
+import com.gadzo.client.modules.create.StressAlert;
 import com.gadzo.client.modules.hud.ArmorHud;
 import com.gadzo.client.modules.hud.ClockHud;
 import com.gadzo.client.modules.hud.ComboHud;
@@ -34,6 +37,14 @@ import com.gadzo.client.modules.performance.ParticleLimiter;
 import com.gadzo.client.modules.performance.RenderTuning;
 import com.gadzo.client.modules.performance.ScreenEffects;
 import com.gadzo.client.modules.performance.WeatherRender;
+import com.gadzo.client.modules.survival.CompassHud;
+import com.gadzo.client.modules.survival.DeathPoint;
+import com.gadzo.client.modules.survival.DurabilityHud;
+import com.gadzo.client.modules.survival.ExperienceHud;
+import com.gadzo.client.modules.survival.FoodHud;
+import com.gadzo.client.modules.survival.LightLevelHud;
+import com.gadzo.client.modules.survival.SurvivalAlerts;
+import com.gadzo.client.modules.survival.Waypoints;
 import com.gadzo.client.modules.visual.Fullbright;
 import com.gadzo.client.modules.visual.Zoom;
 import com.gadzo.client.ui.notify.Notifications;
@@ -64,6 +75,7 @@ public class GadzoClient implements ClientModInitializer {
     private static final ModuleManager MODULES = new ModuleManager();
 
     private static RenderTuning renderTuning;
+    private static Waypoints waypoints;
 
     public static ModuleManager modules() {
         return MODULES;
@@ -88,6 +100,7 @@ public class GadzoClient implements ClientModInitializer {
         Notifications.register();
         GadzoCommands.register();
         TitleScreenBranding.register();
+        Waypoints.register(waypoints);
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> MODULES.tick());
 
@@ -117,6 +130,7 @@ public class GadzoClient implements ClientModInitializer {
 
     private void registerModules() {
         renderTuning = new RenderTuning();
+        waypoints = new Waypoints();
 
         MODULES.registerAll(
                 // Performance
@@ -152,11 +166,26 @@ public class GadzoClient implements ClientModInitializer {
                 new Fullbright(),
                 new Zoom(),
 
+                // Survival
+                waypoints,
+                new CompassHud(),
+                new DeathPoint(),
+                new LightLevelHud(),
+                new FoodHud(),
+                new ExperienceHud(),
+                new DurabilityHud(),
+                new SurvivalAlerts(),
+                new SurvivalHelperLauncher(),
+
+                // Create
+                new KineticHud(),
+                new StressAlert(),
+                new CreateHelperLauncher(),
+
                 // Client
                 new SessionHud(),
                 new MenuLauncher(),
                 new HudEditorLauncher(),
-                new CreateHelperLauncher(),
                 new ClientSettings());
     }
 
