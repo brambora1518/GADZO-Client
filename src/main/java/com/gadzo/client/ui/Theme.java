@@ -53,7 +53,7 @@ public final class Theme {
     private static int accentPrimary = 0xFF5B8CFF;
     private static int accentSecondary = 0xFF9B5BFF;
     private static int rainbowPeriodMillis = 6000;
-    private static double cornerRadius = 8.0;
+    private static double cornerRadius = 12.0;
     private static boolean blurEnabled = true;
 
     private Theme() {
@@ -99,7 +99,7 @@ public final class Theme {
 
     /** A smaller radius for nested elements, kept proportional to the main one. */
     public static double radiusSmall() {
-        return Math.max(2.0, cornerRadius * 0.6);
+        return Math.max(2.0, cornerRadius * 0.5);
     }
 
     public static void setBlurEnabled(boolean value) {
@@ -152,50 +152,71 @@ public final class Theme {
     }
 
     // -- surfaces ---------------------------------------------------------------------
+    //
+    // Every alpha here is deliberately lower than a "solid panel" theme would use. The blur
+    // behind a GADZO window is only worth having if the panel itself lets some of it show
+    // through — a 94%-opaque fill over a blurred backdrop reads as an ordinary flat menu that
+    // happens to blur the edges, not glass. Lowering the fill alpha is what makes the frosted
+    // look actually frosted.
 
     public static int background() {
         return switch (appearance) {
-            case DARK -> 0xF00E1117;
-            case MIDNIGHT -> 0xF6070911;
-            case LIGHT -> 0xF2F4F6FA;
+            case DARK -> 0xD8121620;
+            case MIDNIGHT -> 0xDE080B14;
+            case LIGHT -> 0xD8F4F6FA;
         };
     }
 
     public static int surface() {
         return switch (appearance) {
-            case DARK -> 0xFF141922;
-            case MIDNIGHT -> 0xFF0C111C;
-            case LIGHT -> 0xFFFFFFFF;
+            case DARK -> 0xC81A2030;
+            case MIDNIGHT -> 0xCE0E1526;
+            case LIGHT -> 0xD8FFFFFF;
         };
     }
 
     public static int surfaceHigh() {
         return switch (appearance) {
-            case DARK -> 0xFF1B2230;
-            case MIDNIGHT -> 0xFF121A2A;
-            case LIGHT -> 0xFFEDEFF5;
+            case DARK -> 0xE0232B3E;
+            case MIDNIGHT -> 0xE4182238;
+            case LIGHT -> 0xF0EDEFF5;
         };
     }
 
     /** Subtle fill for hovered rows. */
     public static int surfaceHover() {
         return switch (appearance) {
-            case DARK -> 0xFF232C3D;
-            case MIDNIGHT -> 0xFF18223A;
-            case LIGHT -> 0xFFE2E6F0;
+            case DARK -> 0x50FFFFFF;
+            case MIDNIGHT -> 0x48FFFFFF;
+            case LIGHT -> 0x30101828;
         };
     }
 
+    /**
+     * A single, subtle stroke for the outer edge of a glass panel — the "light catching the
+     * edge of frosted glass" cue. Meant to be drawn once per panel, not per row or per
+     * control; that distinction is the difference between a glass window and a page full of
+     * boxes.
+     */
+    public static int glassEdge() {
+        return switch (appearance) {
+            case DARK -> 0x30FFFFFF;
+            case MIDNIGHT -> 0x28FFFFFF;
+            case LIGHT -> 0x50FFFFFF;
+        };
+    }
+
+    /** Reserved for the rare control that genuinely needs a boundary — a focused input. */
     public static int border() {
         return switch (appearance) {
-            case DARK -> 0x33FFFFFF;
-            case MIDNIGHT -> 0x2BFFFFFF;
-            case LIGHT -> 0x1A000000;
+            case DARK -> 0x2AFFFFFF;
+            case MIDNIGHT -> 0x22FFFFFF;
+            case LIGHT -> 0x16000000;
         };
     }
 
     public static int shadowColor() {
-        return appearance == Appearance.LIGHT ? 0x40000000 : 0x80000000;
+        return appearance == Appearance.LIGHT ? 0x38000000 : 0x60000000;
     }
 
     // -- text -------------------------------------------------------------------------

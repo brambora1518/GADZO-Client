@@ -29,10 +29,11 @@ import java.util.Map;
 public final class SettingRenderer {
 
     public static final double ROW_HEIGHT = 24.0;
-    private static final double TOGGLE_WIDTH = 28.0;
-    private static final double TOGGLE_HEIGHT = 14.0;
+    private static final double TOGGLE_WIDTH = 32.0;
+    private static final double TOGGLE_HEIGHT = 18.0;
     private static final double SLIDER_HEIGHT = 4.0;
-    private static final double SWATCH_SIZE = 14.0;
+    private static final double SLIDER_KNOB = 10.0;
+    private static final double SWATCH_SIZE = 15.0;
 
     private static final Map<Setting<?>, Animation> HOVER = new HashMap<>();
     private static final Map<Setting<?>, Animation> TOGGLE = new HashMap<>();
@@ -140,6 +141,14 @@ public final class SettingRenderer {
         }
     }
 
+    /**
+     * The pill-and-knob toggle, matching the one in the mods menu's own module list.
+     *
+     * <p>The knob is a rounded square, not a bare circle: a genuine circle at the radius this
+     * control fits in has too few scanlines to look smooth no matter how the edge is
+     * anti-aliased, and reads as chunky rather than crisp. A slightly larger square with the
+     * same corner radius uses more of them.
+     */
     private static void renderToggle(DrawContext gfx, BooleanSetting setting, double x, double y) {
         Animation animation = toggle(setting, setting.get());
         animation.toBoolean(setting.get());
@@ -148,11 +157,10 @@ public final class SettingRenderer {
         int track = ColorUtil.mix(Theme.trackOff(), Theme.accent(), t);
         Render2D.roundedRect(gfx, x, y, TOGGLE_WIDTH, TOGGLE_HEIGHT, TOGGLE_HEIGHT / 2.0, track);
 
-        // Knob travels the track width minus its own diameter and the 2px inset either side.
-        double knobRadius = TOGGLE_HEIGHT / 2.0 - 2;
+        double knobSize = TOGGLE_HEIGHT - 4;
         double travel = TOGGLE_WIDTH - TOGGLE_HEIGHT;
-        double knobX = x + TOGGLE_HEIGHT / 2.0 + travel * t;
-        Render2D.circle(gfx, knobX, y + TOGGLE_HEIGHT / 2.0, knobRadius, 0xFFFFFFFF);
+        double knobX = x + 2 + travel * t;
+        Render2D.roundedRect(gfx, knobX, y + 2, knobSize, knobSize, knobSize / 2.0, 0xFFF4F6FA);
     }
 
     private static void renderSlider(DrawContext gfx, TextRenderer font, NumberSetting setting,
@@ -167,7 +175,10 @@ public final class SettingRenderer {
         if (filled > 0.5) {
             Render2D.roundedRect(gfx, x, trackY, filled, SLIDER_HEIGHT, SLIDER_HEIGHT / 2.0, Theme.accent());
         }
-        Render2D.circle(gfx, x + filled, trackY + SLIDER_HEIGHT / 2.0, 4.0, 0xFFFFFFFF);
+        // Same reasoning as the toggle knob above: a rounded square reads cleaner than a bare
+        // circle this small.
+        Render2D.roundedRect(gfx, x + filled - SLIDER_KNOB / 2.0, trackY + SLIDER_HEIGHT / 2.0 - SLIDER_KNOB / 2.0,
+                SLIDER_KNOB, SLIDER_KNOB, SLIDER_KNOB / 2.0, 0xFFF4F6FA);
     }
 
     private static void renderDropdown(DrawContext gfx, TextRenderer font, EnumSetting<?> setting,
@@ -217,9 +228,8 @@ public final class SettingRenderer {
         return setting.label((E) constant);
     }
 
+    /** Just the colour, rounded to match everything else — no separate frame drawn behind it. */
     private static void renderSwatch(DrawContext gfx, ColorSetting setting, double x, double y) {
-        Render2D.roundedRect(gfx, x - 1, y - 1, SWATCH_SIZE + 2, SWATCH_SIZE + 2,
-                Theme.radiusSmall(), Theme.border());
         Render2D.roundedRect(gfx, x, y, SWATCH_SIZE, SWATCH_SIZE, Theme.radiusSmall(), setting.get());
     }
 

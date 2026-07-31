@@ -307,6 +307,24 @@ four screens had no entrance animation at all while the mods menu did, which rea
 unfinished corner rather than a deliberate choice. Sidebar rows, machine-list rows and stepper
 buttons animate their hover state the same way, rather than snapping instantly.
 
+**The panels are glass, not boxes.** Every surface's fill went from ~94% opaque to 75–90%, so
+the blurred world behind actually shows through the panel itself rather than only around its
+edges — a nearly-opaque fill over a blurred backdrop reads as an ordinary flat menu that happens
+to blur at the border, not frosted glass. Borders came out almost everywhere they were purely
+decorative: the search field has no box at rest, only a thin accent underline while focused; a
+module row has no background card until it's hovered or selected; a colour swatch is just the
+colour. Each window keeps exactly one boundary — a single hairline on its own outer edge — so
+there is still a sense of where the glass ends, without every row and control inside drawing
+its own.
+
+**Small circular controls got bigger, not smaller.** A toggle knob or a colour-field marker
+drawn as a true circle at a 4–5px radius has so few scanlines to describe a curve with that no
+amount of anti-aliasing math saves it from looking chunky — the fix is more pixels, not a
+cleverer edge. Every such control — the mods-menu and settings-panel toggles, the slider knob,
+the colour picker's position marker — is a few pixels larger now and drawn as a rounded square
+or a ring instead of a filled dot, which is where most of the "pixelated" look actually came
+from.
+
 **A HUD element's measurement methods can be called several times a frame.** `HudModule.render`
 calls `contentWidth`/`contentHeight` twice each (once directly, once through `resolveX`/
 `resolveY`) before `renderContent` runs a fifth time. Elements whose content is cheap to compute

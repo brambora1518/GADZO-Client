@@ -128,14 +128,16 @@ public class ColorPicker {
             Render2D.gradientV(gfx, columnX, y, columnWidth, FIELD_HEIGHT, top, 0xFF000000);
         }
 
-        Render2D.roundedOutline(gfx, x, y, width, FIELD_HEIGHT, 2, 1.0, Theme.border());
+        Render2D.roundedOutline(gfx, x, y, width, FIELD_HEIGHT, 2, 1.0, Theme.glassEdge());
 
-        // Crosshair marker, drawn light or dark depending on what it sits on.
+        // Ring marker rather than a filled dot: a hollow ring at this radius has an inner and
+        // outer edge to anti-alias against, where a solid dot this small is just a blob no
+        // matter how clean the edge math is.
         double markerX = x + saturation * width;
         double markerY = y + (1.0f - value) * FIELD_HEIGHT;
         int marker = value > 0.55 && saturation < 0.55 ? 0xFF11151C : 0xFFFFFFFF;
-        Render2D.circle(gfx, markerX, markerY, 3.0, marker);
-        Render2D.circle(gfx, markerX, markerY, 1.5, ColorUtil.hsb(hue, saturation, value, 255));
+        Render2D.circle(gfx, markerX, markerY, 4.5, marker);
+        Render2D.circle(gfx, markerX, markerY, 3.2, ColorUtil.hsb(hue, saturation, value, 255));
     }
 
     private void drawHueSlider(DrawContext gfx, double x, double y, double width) {

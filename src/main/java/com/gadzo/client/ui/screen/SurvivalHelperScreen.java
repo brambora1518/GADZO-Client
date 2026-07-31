@@ -173,6 +173,11 @@ public class SurvivalHelperScreen extends Screen {
         }
         drawFooter(gfx);
 
+        // The one boundary the window gets: a hairline on the glass edge, drawn once rather
+        // than boxing every row and control inside it.
+        Render2D.roundedOutline(gfx, windowX, windowY, WINDOW_WIDTH, WINDOW_HEIGHT, Theme.radius(),
+                1.0, Theme.glassEdge());
+
         gfx.getMatrices().pop();
     }
 
@@ -219,9 +224,12 @@ public class SurvivalHelperScreen extends Screen {
         double y = windowY + 13;
         double boxWidth = contentWidth() - PADDING * 2;
 
-        Render2D.roundedRect(gfx, x, y, boxWidth, 20, Theme.radiusSmall(), Theme.surface());
-        Render2D.roundedOutline(gfx, x, y, boxWidth, 20, Theme.radiusSmall(), 1.0,
-                searchFocused ? Theme.accent() : Theme.border());
+        // No box at rest — a faint tint on the glass, and a thin accent underline only while
+        // focused, rather than a border that is always visible.
+        Render2D.roundedRect(gfx, x, y, boxWidth, 20, Theme.radiusSmall(), ColorUtil.fade(Theme.surfaceHigh(), 0.7));
+        if (searchFocused) {
+            Render2D.rect(gfx, x + 6, y + 19, boxWidth - 12, 1.2, Theme.accent());
+        }
 
         String display = searchQuery.isEmpty() && !searchFocused
                 ? "Search the reference..."

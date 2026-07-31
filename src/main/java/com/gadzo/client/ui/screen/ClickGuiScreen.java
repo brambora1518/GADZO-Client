@@ -186,6 +186,12 @@ public class ClickGuiScreen extends Screen {
         drawModuleList(gfx, mouseX, mouseY, alpha);
         drawSettingsPanel(gfx, mouseX, mouseY, alpha);
         drawFooter(gfx, alpha);
+
+        // The one boundary the whole window gets: a hairline catching light on the edge of
+        // the glass. Everything inside is drawn without its own outline — this is the only
+        // stroke in the panel, which is the point.
+        Render2D.roundedOutline(gfx, windowX, windowY, WINDOW_WIDTH, WINDOW_HEIGHT, Theme.radius(),
+                1.0, ColorUtil.fade(Theme.glassEdge(), alpha));
     }
 
     private void drawSidebar(DrawContext gfx, int mouseX, int mouseY, double alpha) {
@@ -239,22 +245,21 @@ public class ClickGuiScreen extends Screen {
         double y = windowY + 13;
         double boxWidth = contentWidth() - PADDING * 2;
 
-        boolean hovered = MathUtil.within(mouseX, mouseY, x, y, x + boxWidth, y + 20);
-        int border = searchFocused ? Theme.accent() : Theme.border();
-
+        // No box, no outline at rest — the field is just a slightly lighter patch of the
+        // panel's own glass. Focus is shown with a single thin accent underline rather than a
+        // full border, the same pattern a modern web search field uses.
         Render2D.roundedRect(gfx, x, y, boxWidth, 20, Theme.radiusSmall(),
-                ColorUtil.fade(Theme.surface(), alpha));
-        Render2D.roundedOutline(gfx, x, y, boxWidth, 20, Theme.radiusSmall(), 1.0,
-                ColorUtil.fade(border, alpha * (hovered || searchFocused ? 1.0 : 0.6)));
+                ColorUtil.fade(Theme.surfaceHigh(), alpha * 0.7));
+        if (searchFocused) {
+            Render2D.rect(gfx, x + 6, y + 19, boxWidth - 12, 1.2,
+                    ColorUtil.fade(Theme.accent(), alpha));
+        }
 
         String display = searchQuery.isEmpty() && !searchFocused
                 ? "Search modules..."
                 : searchQuery + (searchFocused && (System.currentTimeMillis() / 500) % 2 == 0 ? "_" : "");
         int textColor = searchQuery.isEmpty() && !searchFocused ? Theme.textMuted() : Theme.textPrimary();
         Render2D.text(gfx, textRenderer, display, x + 7, y + 6, ColorUtil.fade(textColor, alpha));
-
-        Render2D.separator(gfx, contentX(), windowY + HEADER_HEIGHT - 1, contentWidth(),
-                ColorUtil.fade(Theme.border(), alpha));
     }
 
     private void drawModuleList(DrawContext gfx, int mouseX, int mouseY, double alpha) {
@@ -290,23 +295,25 @@ public class ClickGuiScreen extends Screen {
         boolean selected = module == selectedModule;
 
         Animation hover = hoverOf(module);
-        hover.toBoolean(hovered);
+        hover.toBoolean(hovered || selected);
         Animation toggle = toggleOf(module);
         toggle.toBoolean(module.isEnabled());
 
-        int background = ColorUtil.mix(Theme.surface(), Theme.surfaceHover(), hover.value());
-        Render2D.roundedRect(gfx, x, y, width, MODULE_ROW_HEIGHT, Theme.radiusSmall(),
-                ColorUtil.fade(background, alpha));
-
-        if (selected) {
-            Render2D.roundedOutline(gfx, x, y, width, MODULE_ROW_HEIGHT, Theme.radiusSmall(), 1.0,
-                    ColorUtil.fade(Theme.accent(), alpha));
+        // Rows sit directly on the panel's own glass at rest — no card behind every one of
+        // them — and only pick up a soft tint on hover or selection. A background box on
+        // every row regardless of state is exactly the boxy look a flat list should avoid.
+        if (hover.value() > 0.01) {
+            int tint = selected ? ColorUtil.withAlpha(Theme.accent(), 30) : Theme.surfaceHover();
+            Render2D.roundedRect(gfx, x, y, width, MODULE_ROW_HEIGHT, Theme.radiusSmall(),
+                    ColorUtil.fade(tint, hover.value() * alpha));
         }
 
-        // Enabled state reads as a filled accent bar on the leading edge.
-        if (toggle.value() > 0.01) {
+        // Enabled state reads as a filled accent bar on the leading edge — the only boundary
+        // this row draws, and it doubles as the selection marker.
+        double barAlpha = Math.max(toggle.value(), selected ? 0.5 : 0.0);
+        if (barAlpha > 0.01) {
             Render2D.roundedRect(gfx, x, y + 6, 3, MODULE_ROW_HEIGHT - 12, 1.5,
-                    ColorUtil.fade(Theme.accent(), toggle.value() * alpha));
+                    ColorUtil.fade(Theme.accent(), barAlpha * alpha));
         }
 
         double textX = x + 11;
@@ -320,17 +327,33 @@ public class ClickGuiScreen extends Screen {
             Render2D.textRight(gfx, textRenderer, "always on", x + width - 10, y + 12,
                     ColorUtil.fade(Theme.textMuted(), alpha), false);
         } else {
-            drawSmallToggle(gfx, x + width - 34, y + (MODULE_ROW_HEIGHT - 14) / 2.0, toggle.value(), alpha);
+            drawSmallToggle(gfx, x + width - 36, y + (MODULE_ROW_HEIGHT - TOGGLE_HEIGHT) / 2.0,
+                    toggle.value(), alpha);
         }
     }
 
+    private static final double TOGGLE_WIDTH = 30;
+    private static final double TOGGLE_HEIGHT = 16;
+
+    /**
+     * The pill-and-knob switch used everywhere in this client.
+     *
+     * <p>The knob is a rounded square rather than a bare circle, sized a couple of pixels
+     * larger than the tightest fit it could get away with. A perfect circle at a 5px radius
+     * has only five scanlines of vertical resolution to describe a curve with, and no amount
+     * of edge anti-aliasing makes that read as smooth — it needs more pixels to work with,
+     * not a cleverer edge. This one gets them.
+     */
     private void drawSmallToggle(DrawContext gfx, double x, double y, double t, double alpha) {
-        double w = 26;
-        double h = 14;
         int track = ColorUtil.mix(Theme.trackOff(), Theme.accent(), t);
-        Render2D.roundedRect(gfx, x, y, w, h, h / 2.0, ColorUtil.fade(track, alpha));
-        Render2D.circle(gfx, x + h / 2.0 + (w - h) * t, y + h / 2.0, h / 2.0 - 2,
-                ColorUtil.fade(0xFFFFFFFF, alpha));
+        Render2D.roundedRect(gfx, x, y, TOGGLE_WIDTH, TOGGLE_HEIGHT, TOGGLE_HEIGHT / 2.0,
+                ColorUtil.fade(track, alpha));
+
+        double knobSize = TOGGLE_HEIGHT - 4;
+        double travel = TOGGLE_WIDTH - TOGGLE_HEIGHT;
+        double knobX = x + 2 + travel * t;
+        Render2D.roundedRect(gfx, knobX, y + 2, knobSize, knobSize, knobSize / 2.0,
+                ColorUtil.fade(0xFFF4F6FA, alpha));
     }
 
     private void drawSettingsPanel(DrawContext gfx, int mouseX, int mouseY, double alpha) {
