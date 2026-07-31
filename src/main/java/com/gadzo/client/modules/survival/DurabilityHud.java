@@ -58,12 +58,34 @@ public class DurabilityHud extends HudModule {
     }
 
     /**
+     * Cache for {@link #entries()}, refreshed a few times a second rather than every call.
+     *
+     * <p>{@link #render} calls {@code contentWidth}, {@code contentHeight} and
+     * {@code renderContent} every frame, so without this a durability list that nothing has
+     * touched would be rebuilt and re-sorted up to five times per frame — needless allocation
+     * for a value that changes at most once per hit taken.
+     */
+    private static final long CACHE_MILLIS = 100;
+    private List<Entry> cachedEntries = List.of();
+    private long cachedAt;
+
+    /**
      * Collects damageable gear from armour, main hand and off hand.
      *
      * <p>Deliberately not the whole inventory: a chest full of half-used tools is not something
      * anyone needs warning about, and it would push the list off the screen.
      */
     private List<Entry> entries() {
+        long now = System.currentTimeMillis();
+        if (now - cachedAt < CACHE_MILLIS) {
+            return cachedEntries;
+        }
+        cachedAt = now;
+        cachedEntries = computeEntries();
+        return cachedEntries;
+    }
+
+    private List<Entry> computeEntries() {
         ClientPlayerEntity player = Mc.player();
         if (player == null) {
             return List.of();

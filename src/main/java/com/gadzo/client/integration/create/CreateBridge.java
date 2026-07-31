@@ -51,6 +51,7 @@ public final class CreateBridge {
     private static Field stressField;
     private static Field capacityField;
     private static Field networkSizeField;
+    private static Field networkField;
 
     private static Method getImpact;
     private static Method getCapacity;
@@ -96,6 +97,10 @@ public final class CreateBridge {
             stressField = accessibleField(kineticType, "stress");
             capacityField = accessibleField(kineticType, "capacity");
             networkSizeField = accessibleField(kineticType, "networkSize");
+            // "network" is a public field (the network id, or null before the first sync), so
+            // this doesn't strictly need setAccessible — but going through the same helper as
+            // the protected fields keeps this block uniform and costs nothing.
+            networkField = accessibleField(kineticType, "network");
 
             Class<?> stressValues = Class.forName(BLOCK_STRESS_VALUES, false, loader);
             getImpact = stressValues.getMethod("getImpact", Block.class);
@@ -121,6 +126,23 @@ public final class CreateBridge {
     public static boolean isKinetic(BlockEntity blockEntity) {
         return blockEntity != null && resolve() == State.READY
                 && kineticType.isInstance(blockEntity);
+    }
+
+    /**
+     * The network id a kinetic block belongs to, for grouping blocks scattered across many
+     * chunks into the networks they actually form.
+     *
+     * @return the id, or {@code null} if the block isn't kinetic or hasn't synced yet
+     */
+    public static Long networkId(BlockEntity blockEntity) {
+        if (!isKinetic(blockEntity)) {
+            return null;
+        }
+        try {
+            return (Long) networkField.get(blockEntity);
+        } catch (ReflectiveOperationException | RuntimeException e) {
+            return null;
+        }
     }
 
     /**

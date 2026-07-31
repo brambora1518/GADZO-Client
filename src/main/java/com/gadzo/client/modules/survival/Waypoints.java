@@ -174,10 +174,13 @@ public class Waypoints extends Module {
 
         matrices.pop();
 
-        // Text is queued on a buffer that the world pass does not flush for us.
-        if (consumers instanceof VertexConsumerProvider.Immediate immediate) {
-            immediate.draw();
-        }
+        // Deliberately not flushing the buffer here. `consumers` is the same shared
+        // Immediate instance vanilla queues entities, particles and debug lines into for this
+        // frame, and it gets drawn once, in order, after every AFTER_TRANSLUCENT listener has
+        // had a turn. Calling draw() from inside this hook would force an early, out-of-order
+        // flush of whatever the world renderer had already batched before us — splitting
+        // batches that would otherwise merge into one draw call, for no benefit, since
+        // everything queued here still reaches the screen this same frame either way.
     }
 
     private void drawBeam(MatrixStack matrices, VertexConsumerProvider consumers,

@@ -38,11 +38,14 @@ import com.gadzo.client.modules.performance.RenderTuning;
 import com.gadzo.client.modules.performance.ScreenEffects;
 import com.gadzo.client.modules.performance.WeatherRender;
 import com.gadzo.client.modules.survival.CompassHud;
+import com.gadzo.client.modules.survival.CropWatchHud;
 import com.gadzo.client.modules.survival.DeathPoint;
 import com.gadzo.client.modules.survival.DurabilityHud;
+import com.gadzo.client.modules.survival.ElytraHud;
 import com.gadzo.client.modules.survival.ExperienceHud;
 import com.gadzo.client.modules.survival.FoodHud;
 import com.gadzo.client.modules.survival.LightLevelHud;
+import com.gadzo.client.modules.survival.TotemHud;
 import com.gadzo.client.modules.survival.SurvivalAlerts;
 import com.gadzo.client.modules.survival.Waypoints;
 import com.gadzo.client.modules.visual.Fullbright;
@@ -174,6 +177,9 @@ public class GadzoClient implements ClientModInitializer {
                 new FoodHud(),
                 new ExperienceHud(),
                 new DurabilityHud(),
+                new TotemHud(),
+                new ElytraHud(),
+                new CropWatchHud(),
                 new SurvivalAlerts(),
                 new SurvivalHelperLauncher(),
 

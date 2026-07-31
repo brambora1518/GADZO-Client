@@ -97,6 +97,9 @@ rarely stays on the opponent and a panel that vanished instantly would just flic
 | **Food** | Hunger *and saturation* — the hidden value that decides how long you stay fed and whether you regenerate. |
 | **Experience** | Level, points to the next one, and levels remaining before an enchanting table offers its best tier. |
 | **Durability** | Everything worn or held that is close to breaking, sorted by what breaks first. |
+| **Totems** | How many Totems of Undying you are carrying — a warning colour at zero rather than a number you have to read to interpret. |
+| **Elytra** | Altitude, vertical and horizontal speed, and firework rockets left, visible only while actually gliding. |
+| **Crop watch** | Growth stage of whatever you are looking at, read generically off any block's `age` property — works on modded crops the same as vanilla ones. |
 | **Survival alerts** | Low health, drowning, hunger and gear warnings — fired on a threshold being *crossed*, not while it is true. |
 
 Waypoints are stored per world, in their own file, deliberately outside the profile system:
@@ -143,6 +146,13 @@ Large-to-small doubles, small-to-large halves, and everything else passes speed 
 unchanged, so the only reachable ratios are powers of two. Ask for 45 RPM from 64 and the
 solver says plainly that no cogwheel chain can do it and you need a Rotational Speed Controller
 — rather than offering a near miss.
+
+**Networks nearby** — the kinetic readout shows one block at a time; this shows the whole
+factory. It walks the loaded chunks around you, groups every kinetic block it finds by the
+network it actually belongs to, and lists each network's size, stress and load. Scanning every
+block entity in a multi-chunk radius is real work, so it runs on a two-second timer while this
+tab is open and not at all otherwise — a diagnostic tool has no business being the thing it's
+diagnosing.
 
 None of it is a hard dependency. Everything goes through reflection against Create's own class
 names, which the loader does not remap, and the whole bridge latches off with a single log line
@@ -290,6 +300,20 @@ from inside the `Minecraft` constructor, so a field initialised at class-load ti
 **Configs are written atomically** — to a temp file, then moved into place — so a crash
 mid-save leaves the previous profile intact rather than a truncated one. Missing keys fall back
 to defaults, so a config from an older build still loads after new modules are added.
+
+**Every panel opens the same way.** A fade plus an 18-pixel slide-up, shared across the mods
+menu, the HUD editor, the Create helper and the survival helper — added because three of those
+four screens had no entrance animation at all while the mods menu did, which read as an
+unfinished corner rather than a deliberate choice. Sidebar rows, machine-list rows and stepper
+buttons animate their hover state the same way, rather than snapping instantly.
+
+**A HUD element's measurement methods can be called several times a frame.** `HudModule.render`
+calls `contentWidth`/`contentHeight` twice each (once directly, once through `resolveX`/
+`resolveY`) before `renderContent` runs a fifth time. Elements whose content is cheap to compute
+don't need to care; elements that build a list — durability, the Create readout, crop growth —
+cache the result for a short, fixed window (50–100 ms) rather than recomputing on every one of
+those calls. It is not a visible difference at 20 updates a second, and it is the difference
+between one list rebuild a frame and five.
 
 ---
 

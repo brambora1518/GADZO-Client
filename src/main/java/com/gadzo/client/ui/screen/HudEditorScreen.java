@@ -6,6 +6,7 @@ import com.gadzo.client.core.hud.HudManager;
 import com.gadzo.client.core.hud.HudModule;
 import com.gadzo.client.ui.Render2D;
 import com.gadzo.client.ui.Theme;
+import com.gadzo.client.util.Animation;
 import com.gadzo.client.util.ColorUtil;
 import com.gadzo.client.util.MathUtil;
 
@@ -32,6 +33,9 @@ public class HudEditorScreen extends Screen {
     /** How close, in pixels, a drag must come before it snaps. */
     private static final double SNAP_DISTANCE = 6.0;
 
+    /** Fades the dim and the help bar in; the outlines and elements themselves need no fade. */
+    private final Animation openAnimation = new Animation(0.0, 220L);
+
     private HudModule dragged;
 
     /** Grab point within the dragged element, so it does not jump to the cursor. */
@@ -49,6 +53,7 @@ public class HudEditorScreen extends Screen {
     @Override
     protected void init() {
         HudManager.setEditorOpen(true);
+        openAnimation.to(1.0);
     }
 
     @Override
@@ -74,16 +79,17 @@ public class HudEditorScreen extends Screen {
      * <p>See {@code ClickGuiScreen.extractBackground}: vanilla's default background requests
      * a blur too, and only one is permitted per frame.
      */
-    private void drawBackdrop(DrawContext gfx) {
+    private void drawBackdrop(DrawContext gfx, double open) {
         if (Theme.blurEnabled()) {
             Render2D.blurBehind(gfx);
         }
-        Render2D.rect(gfx, 0, 0, width, height, 0x99000000);
+        Render2D.rect(gfx, 0, 0, width, height, ColorUtil.fade(0x99000000, open));
     }
 
     @Override
     public void render(DrawContext gfx, int mouseX, int mouseY, float partialTick) {
-        drawBackdrop(gfx);
+        double open = openAnimation.value();
+        drawBackdrop(gfx, open);
         drawCenterLines(gfx);
 
         for (HudModule module : editableElements()) {
@@ -92,7 +98,7 @@ public class HudEditorScreen extends Screen {
         }
 
         drawGuides(gfx);
-        drawHelpBar(gfx);
+        drawHelpBar(gfx, open);
     }
 
     private void drawCenterLines(DrawContext gfx) {
@@ -137,16 +143,20 @@ public class HudEditorScreen extends Screen {
         }
     }
 
-    private void drawHelpBar(DrawContext gfx) {
+    private void drawHelpBar(DrawContext gfx, double open) {
         String help = "Drag to move  ·  arrows nudge  ·  R resets selected  ·  Esc saves and exits";
         double barWidth = textRenderer.getWidth(help) + 20;
         double x = (width - barWidth) / 2.0;
-        double y = height - 26;
+        // Rises the last few pixels into place rather than appearing fully formed, so the one
+        // piece of chrome on an otherwise bare editing surface still reads as considered.
+        double y = height - 26 + (1.0 - open) * 8.0;
 
-        Render2D.shadow(gfx, x, y, barWidth, 18, Theme.radiusSmall(), 4, Theme.shadowColor());
+        Render2D.shadow(gfx, x, y, barWidth, 18, Theme.radiusSmall(), 4,
+                ColorUtil.fade(Theme.shadowColor(), open));
         Render2D.roundedRect(gfx, x, y, barWidth, 18, Theme.radiusSmall(),
-                ColorUtil.withAlpha(Theme.surface(), 240));
-        Render2D.textCentered(gfx, textRenderer, help, width / 2.0, y + 5, Theme.textSecondary(), false);
+                ColorUtil.fade(ColorUtil.withAlpha(Theme.surface(), 240), open));
+        Render2D.textCentered(gfx, textRenderer, help, width / 2.0, y + 5,
+                ColorUtil.fade(Theme.textSecondary(), open), false);
     }
 
     // -- snapping ------------------------------------------------------------------------------

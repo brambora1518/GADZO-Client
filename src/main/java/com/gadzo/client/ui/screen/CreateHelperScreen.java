@@ -3,20 +3,25 @@ package com.gadzo.client.ui.screen;
 import com.gadzo.client.integration.create.CreateBridge;
 import com.gadzo.client.integration.create.CreateKnowledge;
 import com.gadzo.client.integration.create.GearTrain;
+import com.gadzo.client.integration.create.NetworkScanner;
 import com.gadzo.client.integration.create.StressCalculator;
 import com.gadzo.client.ui.Render2D;
 import com.gadzo.client.ui.Theme;
+import com.gadzo.client.util.Animation;
 import com.gadzo.client.util.ColorUtil;
 import com.gadzo.client.util.MathUtil;
 
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.gui.screen.Screen;
 import net.minecraft.text.Text;
+import net.minecraft.util.math.BlockPos;
 
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Reference, stress planner and gear-ratio solver for the Create mod.
@@ -46,10 +51,26 @@ public class CreateHelperScreen extends Screen {
     /** Sidebar indices for the tabs that are not knowledge topics. */
     private static final int CALCULATOR_TAB = -2;
     private static final int RATIO_TAB = -3;
+    private static final int NETWORKS_TAB = -4;
+
+    /** How often the networks tab re-scans while it is the open tab. */
+    private static final long NETWORK_RESCAN_MILLIS = 2000;
 
     private static final double STEPPER_SIZE = 18;
 
     private final StressCalculator calculator = new StressCalculator();
+
+    /** Entrance motion: fades and slides the whole panel up, matching the mods menu. */
+    private final Animation openAnimation = new Animation(0.0, 300L);
+
+    /** Sidebar row hover, keyed by tab index rather than by object identity. */
+    private final Map<Integer, Animation> sidebarHover = new HashMap<>();
+
+    /** Machine-row hover in the stress calculator, keyed by row index. */
+    private final Map<Integer, Animation> machineHover = new HashMap<>();
+
+    /** Stepper button hover, keyed by a caller-chosen id ("source-", "source+", ...). */
+    private final Map<String, Animation> stepperHover = new HashMap<>();
 
     private int selectedTopic;
     private String searchQuery = "";
@@ -71,13 +92,35 @@ public class CreateHelperScreen extends Screen {
     /** Y of the sails stepper, captured during render so clicks survive scrolling. */
     private double windmillRowY;
 
+    // Networks tab state. The scan itself is real work — every loaded block entity in a
+    // multi-chunk radius — so it runs on a timer rather than every frame; see NetworkScanner.
+    private List<NetworkScanner.NetworkInfo> networks = List.of();
+    private long networksScannedAt;
+
     public CreateHelperScreen() {
         super(Text.literal("Create helper"));
     }
 
     @Override
+    protected void init() {
+        openAnimation.to(1.0);
+    }
+
+    @Override
     public boolean shouldPause() {
         return false;
+    }
+
+    private Animation sidebarHoverOf(int index) {
+        return sidebarHover.computeIfAbsent(index, ignored -> new Animation(0.0, 150L));
+    }
+
+    private Animation machineHoverOf(int index) {
+        return machineHover.computeIfAbsent(index, ignored -> new Animation(0.0, 120L));
+    }
+
+    private Animation stepperHoverOf(String id) {
+        return stepperHover.computeIfAbsent(id, ignored -> new Animation(0.0, 120L));
     }
 
     private double contentX() {
@@ -110,6 +153,7 @@ public class CreateHelperScreen extends Screen {
         }
         items.add(new SidebarItem("Stress calculator", CALCULATOR_TAB, true));
         items.add(new SidebarItem("Gear ratios", RATIO_TAB, false));
+        items.add(new SidebarItem("Networks nearby", NETWORKS_TAB, false));
         return items;
     }
 
@@ -129,18 +173,25 @@ public class CreateHelperScreen extends Screen {
 
     // -- rendering ------------------------------------------------------------------------
 
-    private void drawBackdrop(DrawContext gfx) {
+    private void drawBackdrop(DrawContext gfx, double open) {
         if (Theme.blurEnabled()) {
             Render2D.blurBehind(gfx);
         }
-        Render2D.rect(gfx, 0, 0, width, height, 0xB0000000);
+        Render2D.rect(gfx, 0, 0, width, height, ColorUtil.fade(0xB0000000, open));
     }
 
     @Override
     public void render(DrawContext gfx, int mouseX, int mouseY, float partialTick) {
-        drawBackdrop(gfx);
+        double open = openAnimation.value();
+        drawBackdrop(gfx, open);
         windowX = (width - WINDOW_WIDTH) / 2.0;
         windowY = (height - WINDOW_HEIGHT) / 2.0;
+
+        // Slides up from slightly below rest as it opens, matching the mods menu so every
+        // GADZO panel enters the same way rather than three of the four popping in instantly.
+        double slide = (1.0 - open) * 18.0;
+        gfx.getMatrices().push();
+        gfx.getMatrices().translate(0.0f, (float) slide, 0.0f);
 
         Render2D.shadow(gfx, windowX, windowY, WINDOW_WIDTH, WINDOW_HEIGHT, Theme.radius(), 10,
                 Theme.shadowColor());
@@ -154,10 +205,14 @@ public class CreateHelperScreen extends Screen {
             drawCalculator(gfx, mouseX, mouseY);
         } else if (selectedTopic == RATIO_TAB) {
             drawRatios(gfx, mouseX, mouseY);
+        } else if (selectedTopic == NETWORKS_TAB) {
+            drawNetworks(gfx);
         } else {
             drawEntries(gfx);
         }
         drawFooter(gfx);
+
+        gfx.getMatrices().pop();
     }
 
     private void drawSidebar(DrawContext gfx, int mouseX, int mouseY) {
@@ -182,10 +237,13 @@ public class CreateHelperScreen extends Screen {
         boolean hovered = MathUtil.within(mouseX, mouseY, windowX + 6, y,
                 windowX + SIDEBAR_WIDTH - 6, y + SIDEBAR_ROW);
 
-        if (selected || hovered) {
+        Animation hover = sidebarHoverOf(item.index());
+        hover.toBoolean(hovered || selected);
+
+        if (hover.value() > 0.01) {
+            int highlight = selected ? ColorUtil.withAlpha(Theme.accent(), 42) : Theme.surfaceHover();
             Render2D.roundedRect(gfx, windowX + 6, y, SIDEBAR_WIDTH - 12, SIDEBAR_ROW,
-                    Theme.radiusSmall(),
-                    selected ? ColorUtil.withAlpha(Theme.accent(), 42) : Theme.surfaceHover());
+                    Theme.radiusSmall(), ColorUtil.fade(highlight, hover.value()));
         }
         if (selected) {
             Render2D.roundedRect(gfx, windowX + 6, y + 5, 3, SIDEBAR_ROW - 10, 1.5, Theme.accent());
@@ -295,9 +353,11 @@ public class CreateHelperScreen extends Screen {
             double y = machineRowY(i);
 
             boolean hovered = MathUtil.within(mouseX, mouseY, x, y, x + listWidth, y + 15);
-            if (hovered) {
+            Animation hover = machineHoverOf(i);
+            hover.toBoolean(hovered);
+            if (hover.value() > 0.01) {
                 Render2D.roundedRect(gfx, x - 3, y - 2, listWidth + 6, 15, Theme.radiusSmall(),
-                        Theme.surfaceHover());
+                        ColorUtil.fade(Theme.surfaceHover(), hover.value()));
             }
             int count = countOf(machine);
             Render2D.text(gfx, textRenderer,
@@ -454,13 +514,20 @@ public class CreateHelperScreen extends Screen {
      */
     private void drawStepper(DrawContext gfx, String label, String value, double y,
                              int mouseX, int mouseY) {
+        // The hover id has to be unique per stepper on screen, and rows repeat across tabs and
+        // scroll positions — the label is stable and unique in practice, unlike y.
+        drawStepper(gfx, label, value, y, mouseX, mouseY, label);
+    }
+
+    private void drawStepper(DrawContext gfx, String label, String value, double y,
+                             int mouseX, int mouseY, String hoverId) {
         Render2D.text(gfx, textRenderer, label, contentX() + PADDING, y + 5, Theme.textSecondary());
 
         double minusX = stepperMinusX();
         double plusX = stepperPlusX();
 
-        drawStepperButton(gfx, "-", minusX, y, mouseX, mouseY);
-        drawStepperButton(gfx, "+", plusX, y, mouseX, mouseY);
+        drawStepperButton(gfx, "-", minusX, y, mouseX, mouseY, hoverId + "-");
+        drawStepperButton(gfx, "+", plusX, y, mouseX, mouseY, hoverId + "+");
 
         Render2D.textCentered(gfx, textRenderer, value,
                 (minusX + STEPPER_SIZE + plusX) / 2.0, y + 5, Theme.textPrimary(), false);
@@ -477,10 +544,13 @@ public class CreateHelperScreen extends Screen {
     }
 
     private void drawStepperButton(DrawContext gfx, String glyph, double x, double y,
-                                   int mouseX, int mouseY) {
+                                   int mouseX, int mouseY, String hoverId) {
         boolean hovered = MathUtil.within(mouseX, mouseY, x, y, x + STEPPER_SIZE, y + STEPPER_SIZE);
-        Render2D.roundedRect(gfx, x, y, STEPPER_SIZE, STEPPER_SIZE, Theme.radiusSmall(),
-                hovered ? Theme.surfaceHover() : Theme.surface());
+        Animation hover = stepperHoverOf(hoverId);
+        hover.toBoolean(hovered);
+
+        int background = ColorUtil.mix(Theme.surface(), Theme.surfaceHover(), hover.value());
+        Render2D.roundedRect(gfx, x, y, STEPPER_SIZE, STEPPER_SIZE, Theme.radiusSmall(), background);
         Render2D.textCentered(gfx, textRenderer, glyph, x + STEPPER_SIZE / 2.0, y + 5,
                 Theme.textPrimary(), false);
     }
@@ -499,6 +569,100 @@ public class CreateHelperScreen extends Screen {
 
     private int adjustRpm(int current, int direction) {
         return MathUtil.clamp(current + rpmStep(current) * direction, 1, GearTrain.MAX_RPM);
+    }
+
+    // -- networks nearby ------------------------------------------------------------------
+
+    /**
+     * Re-scans on a timer while this tab is open, rather than every frame or every open.
+     *
+     * <p>The scan walks every loaded chunk in a multi-chunk radius; running it at render
+     * frequency would make a diagnostic tool into a performance problem in its own right.
+     */
+    private void refreshNetworksIfDue() {
+        long now = System.currentTimeMillis();
+        if (now - networksScannedAt < NETWORK_RESCAN_MILLIS && !networks.isEmpty()) {
+            return;
+        }
+        networksScannedAt = now;
+        networks = NetworkScanner.scanNearby();
+    }
+
+    private void drawNetworks(DrawContext gfx) {
+        refreshNetworksIfDue();
+
+        double x = contentX() + PADDING;
+        double innerWidth = contentWidth() - PADDING * 2;
+
+        Render2D.pushScissor(gfx, contentX(), bodyTop(), contentWidth(), bodyBottom() - bodyTop());
+        double y = bodyTop() + 8 - scroll;
+
+        if (!CreateBridge.isLive()) {
+            for (String wrapped : wrap("Create is not installed, or its API did not match this "
+                    + "build — nothing to scan. This tab reads real block entities in the "
+                    + "chunks around you, so it needs the mod itself, unlike the reference and "
+                    + "the planner.", (int) innerWidth)) {
+                Render2D.text(gfx, textRenderer, wrapped, x, y, Theme.textMuted());
+                y += textRenderer.fontHeight + 1;
+            }
+            Render2D.popScissor(gfx);
+            contentHeightCache = 60;
+            return;
+        }
+
+        Render2D.text(gfx, textRenderer,
+                "Every kinetic network within " + NetworkScanner.SCAN_RADIUS_CHUNKS
+                        + " chunks, rescanned every 2 seconds", x, y, Theme.textMuted());
+        y += textRenderer.fontHeight + 8;
+
+        if (networks.isEmpty()) {
+            Render2D.text(gfx, textRenderer, "No kinetic networks found nearby.", x, y,
+                    Theme.textSecondary());
+            y += textRenderer.fontHeight;
+            Render2D.popScissor(gfx);
+            contentHeightCache = y + scroll - bodyTop();
+            return;
+        }
+
+        for (NetworkScanner.NetworkInfo network : networks) {
+            double load = network.load();
+            int statusColor = network.overStressed() ? Theme.danger()
+                    : load > 0.9 ? Theme.danger()
+                    : load > 0.75 ? Theme.warning()
+                    : Theme.success();
+
+            Render2D.roundedRect(gfx, x, y, innerWidth, 15, Theme.radiusSmall(),
+                    ColorUtil.withAlpha(Theme.surface(), 160));
+            Render2D.text(gfx, textRenderer, network.memberCount() + " blocks", x + 6, y + 3,
+                    Theme.textPrimary());
+
+            String stress = String.format("%.0f / %.0f su", network.stress(), network.capacity());
+            Render2D.text(gfx, textRenderer, stress, x + 90, y + 3, Theme.textSecondary());
+
+            BlockPos closest = network.closestMember();
+            String where = closest != null
+                    ? closest.getX() + ", " + closest.getY() + ", " + closest.getZ()
+                    : "";
+            Render2D.textRight(gfx, textRenderer, where, x + innerWidth - 60, y + 3,
+                    Theme.textMuted(), false);
+
+            String verdict = network.overStressed() ? "OVERSTRESSED"
+                    : String.format("%.0f%%", load * 100);
+            Render2D.textRight(gfx, textRenderer, verdict, x + innerWidth, y + 3, statusColor, false);
+
+            y += 18;
+        }
+
+        y += 6;
+        for (String wrapped : wrap("Only chunks already loaded on your screen are scanned, so a "
+                + "network with part of itself unloaded may show a partial member count.",
+                (int) innerWidth)) {
+            Render2D.text(gfx, textRenderer, wrapped, x, y, Theme.textMuted());
+            y += textRenderer.fontHeight + 1;
+        }
+
+        Render2D.popScissor(gfx);
+        contentHeightCache = y + scroll - bodyTop();
     }
 
     // -- footer ---------------------------------------------------------------------------

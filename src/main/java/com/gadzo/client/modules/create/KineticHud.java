@@ -75,8 +75,23 @@ public class KineticHud extends HudModule {
      * <p>Deliberately re-reads every frame rather than caching per block position: stress and
      * speed change while you watch, and a stale number is worse than no number on a readout
      * whose whole job is to tell you what a network is doing right now.
+     *
+     * <p>The lookup itself is throttled to {@value #REFRESH_MILLIS} ms rather than run every
+     * frame: it is a raycast plus several reflective method calls into Create, and stress or
+     * RPM on a real contraption does not change fast enough for a viewer to notice the
+     * difference between that and a 240 Hz refresh — only the allocation and reflection
+     * overhead would.
      */
+    private static final long REFRESH_MILLIS = 100;
+    private long lastRefreshAt;
+
     private void refresh() {
+        long now = System.currentTimeMillis();
+        if (now - lastRefreshAt < REFRESH_MILLIS) {
+            return;
+        }
+        lastRefreshAt = now;
+
         MinecraftClient client = Mc.client();
         if (client == null || client.world == null) {
             return;
@@ -90,13 +105,12 @@ public class KineticHud extends HudModule {
                 KineticReading fresh = CreateBridge.read(blockEntity, name);
                 if (fresh != null) {
                     reading = fresh;
-                    readingTakenAt = System.currentTimeMillis();
+                    readingTakenAt = now;
                     return;
                 }
             }
         }
-        if (reading != null
-                && System.currentTimeMillis() - readingTakenAt > holdTime.get() * 1000) {
+        if (reading != null && now - readingTakenAt > holdTime.get() * 1000) {
             reading = null;
         }
     }

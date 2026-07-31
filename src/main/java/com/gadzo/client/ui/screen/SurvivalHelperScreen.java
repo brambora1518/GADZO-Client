@@ -7,6 +7,7 @@ import com.gadzo.client.survival.Waypoint;
 import com.gadzo.client.survival.WaypointStore;
 import com.gadzo.client.ui.Render2D;
 import com.gadzo.client.ui.Theme;
+import com.gadzo.client.util.Animation;
 import com.gadzo.client.util.ColorUtil;
 import com.gadzo.client.util.MathUtil;
 import com.gadzo.client.util.Mc;
@@ -19,7 +20,9 @@ import net.minecraft.text.Text;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Reference and tools for vanilla survival.
@@ -47,6 +50,15 @@ public class SurvivalHelperScreen extends Screen {
     private static final double WAYPOINT_ROW = 16;
     private static final double FOOD_ROW = 12;
 
+    /** Entrance motion: fades and slides the whole panel up, matching every other GADZO panel. */
+    private final Animation openAnimation = new Animation(0.0, 300L);
+
+    /** Sidebar row hover, keyed by tab index. */
+    private final Map<Integer, Animation> sidebarHover = new HashMap<>();
+
+    /** Waypoint-row hover in the waypoints tab, keyed by row index. */
+    private final Map<Integer, Animation> waypointHover = new HashMap<>();
+
     private int selectedTopic;
     private String searchQuery = "";
     private boolean searchFocused;
@@ -61,8 +73,21 @@ public class SurvivalHelperScreen extends Screen {
     }
 
     @Override
+    protected void init() {
+        openAnimation.to(1.0);
+    }
+
+    @Override
     public boolean shouldPause() {
         return false;
+    }
+
+    private Animation sidebarHoverOf(int index) {
+        return sidebarHover.computeIfAbsent(index, ignored -> new Animation(0.0, 150L));
+    }
+
+    private Animation waypointHoverOf(int index) {
+        return waypointHover.computeIfAbsent(index, ignored -> new Animation(0.0, 120L));
     }
 
     private double contentX() {
@@ -116,13 +141,21 @@ public class SurvivalHelperScreen extends Screen {
 
     @Override
     public void render(DrawContext gfx, int mouseX, int mouseY, float partialTick) {
+        double open = openAnimation.value();
+
         if (Theme.blurEnabled()) {
             Render2D.blurBehind(gfx);
         }
-        Render2D.rect(gfx, 0, 0, width, height, 0xB0000000);
+        Render2D.rect(gfx, 0, 0, width, height, ColorUtil.fade(0xB0000000, open));
 
         windowX = (width - WINDOW_WIDTH) / 2.0;
         windowY = (height - WINDOW_HEIGHT) / 2.0;
+
+        // Slides up from slightly below rest as it opens — the same entrance every GADZO
+        // panel uses, so this screen does not read as the one that forgot the polish.
+        double slide = (1.0 - open) * 18.0;
+        gfx.getMatrices().push();
+        gfx.getMatrices().translate(0.0f, (float) slide, 0.0f);
 
         Render2D.shadow(gfx, windowX, windowY, WINDOW_WIDTH, WINDOW_HEIGHT, Theme.radius(), 10,
                 Theme.shadowColor());
@@ -139,6 +172,8 @@ public class SurvivalHelperScreen extends Screen {
             default -> drawEntries(gfx);
         }
         drawFooter(gfx);
+
+        gfx.getMatrices().pop();
     }
 
     private void drawSidebar(DrawContext gfx, int mouseX, int mouseY) {
@@ -159,10 +194,14 @@ public class SurvivalHelperScreen extends Screen {
             boolean hovered = MathUtil.within(mouseX, mouseY, windowX + 6, y,
                     windowX + SIDEBAR_WIDTH - 6, y + SIDEBAR_ROW);
 
-            if (selected || hovered) {
+            Animation hover = sidebarHoverOf(item.index());
+            hover.toBoolean(hovered || selected);
+
+            if (hover.value() > 0.01) {
+                int highlight = selected
+                        ? ColorUtil.withAlpha(Theme.accent(), 42) : Theme.surfaceHover();
                 Render2D.roundedRect(gfx, windowX + 6, y, SIDEBAR_WIDTH - 12, SIDEBAR_ROW,
-                        Theme.radiusSmall(),
-                        selected ? ColorUtil.withAlpha(Theme.accent(), 42) : Theme.surfaceHover());
+                        Theme.radiusSmall(), ColorUtil.fade(highlight, hover.value()));
             }
             if (selected) {
                 Render2D.roundedRect(gfx, windowX + 6, y + 5, 3, SIDEBAR_ROW - 10, 1.5,
@@ -264,9 +303,11 @@ public class SurvivalHelperScreen extends Screen {
             y = waypointRowY(i);
 
             boolean hovered = MathUtil.within(mouseX, mouseY, x, y, x + innerWidth, y + WAYPOINT_ROW);
-            if (hovered) {
+            Animation hover = waypointHoverOf(i);
+            hover.toBoolean(hovered);
+            if (hover.value() > 0.01) {
                 Render2D.roundedRect(gfx, x - 3, y - 1, innerWidth + 6, WAYPOINT_ROW,
-                        Theme.radiusSmall(), Theme.surfaceHover());
+                        Theme.radiusSmall(), ColorUtil.fade(Theme.surfaceHover(), hover.value()));
             }
 
             // The colour swatch doubles as the visibility indicator: faded means hidden.

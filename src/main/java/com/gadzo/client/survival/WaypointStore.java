@@ -94,14 +94,23 @@ public final class WaypointStore {
 
     // -- access ---------------------------------------------------------------------------
 
-    /** Every waypoint in the current world, across all dimensions. */
+    /**
+     * Every waypoint in the current world, across all dimensions.
+     *
+     * <p>The stored lists are immutable and only ever replaced wholesale by {@link #add},
+     * {@link #remove}, {@link #replace} and {@link #clearCurrentWorld} — never mutated in
+     * place — so this can hand the live reference back without a defensive copy. That matters
+     * here specifically: both the compass and the in-world beam renderer call this every
+     * frame, and a fresh {@code List.copyOf} on each of those calls was allocating for no
+     * reason, since nothing was ever going to change out from under a reader mid-frame anyway.
+     */
     public static List<Waypoint> allInWorld() {
         ensureLoaded();
         String key = currentWorldKey();
         if (key == null) {
             return List.of();
         }
-        return List.copyOf(WORLDS.getOrDefault(key, List.of()));
+        return WORLDS.getOrDefault(key, List.of());
     }
 
     /** Waypoints in the dimension the player is standing in — the ones worth drawing. */
@@ -153,9 +162,16 @@ public final class WaypointStore {
         if (key == null) {
             return false;
         }
-        List<Waypoint> list = WORLDS.computeIfAbsent(key, unused -> new ArrayList<>());
-        list.removeIf(existing -> normalise(existing.name()).equals(normalise(waypoint.name())));
-        list.add(waypoint);
+        List<Waypoint> current = WORLDS.getOrDefault(key, List.of());
+        List<Waypoint> next = new ArrayList<>(current.size() + 1);
+        String needle = normalise(waypoint.name());
+        for (Waypoint existing : current) {
+            if (!normalise(existing.name()).equals(needle)) {
+                next.add(existing);
+            }
+        }
+        next.add(waypoint);
+        WORLDS.put(key, List.copyOf(next));
         save();
         return true;
     }
@@ -166,36 +182,54 @@ public final class WaypointStore {
         if (key == null) {
             return false;
         }
-        List<Waypoint> list = WORLDS.get(key);
-        if (list == null) {
+        List<Waypoint> current = WORLDS.get(key);
+        if (current == null) {
             return false;
         }
-        boolean removed = list.removeIf(existing -> normalise(existing.name()).equals(normalise(name)));
+        String needle = normalise(name);
+        List<Waypoint> next = new ArrayList<>(current.size());
+        boolean removed = false;
+        for (Waypoint existing : current) {
+            if (normalise(existing.name()).equals(needle)) {
+                removed = true;
+            } else {
+                next.add(existing);
+            }
+        }
         if (removed) {
+            WORLDS.put(key, List.copyOf(next));
             save();
         }
         return removed;
     }
 
-    /** Replaces a waypoint in place, matching on name. */
+    /** Replaces a waypoint, matching on name. */
     public static boolean replace(Waypoint waypoint) {
         ensureLoaded();
         String key = currentWorldKey();
         if (key == null) {
             return false;
         }
-        List<Waypoint> list = WORLDS.get(key);
-        if (list == null) {
+        List<Waypoint> current = WORLDS.get(key);
+        if (current == null) {
             return false;
         }
-        for (int i = 0; i < list.size(); i++) {
-            if (normalise(list.get(i).name()).equals(normalise(waypoint.name()))) {
-                list.set(i, waypoint);
-                save();
-                return true;
+        String needle = normalise(waypoint.name());
+        List<Waypoint> next = new ArrayList<>(current.size());
+        boolean found = false;
+        for (Waypoint existing : current) {
+            if (normalise(existing.name()).equals(needle)) {
+                next.add(waypoint);
+                found = true;
+            } else {
+                next.add(existing);
             }
         }
-        return false;
+        if (found) {
+            WORLDS.put(key, List.copyOf(next));
+            save();
+        }
+        return found;
     }
 
     public static int clearCurrentWorld() {
@@ -238,7 +272,7 @@ public final class WaypointStore {
                         list.add(waypoint);
                     }
                 }
-                WORLDS.put(key, list);
+                WORLDS.put(key, List.copyOf(list));
             }
         } catch (IOException | RuntimeException e) {
             // A corrupt waypoint file must not stop the client loading. The player loses the
