@@ -48,6 +48,16 @@ public final class Theme {
         }
     }
 
+    /**
+     * Bumped whenever the client's own styling defaults change.
+     *
+     * <p>Read by the config loader: a profile written under an older style version keeps the
+     * colours its owner chose but takes the new defaults for the values the client styles
+     * itself. Without it, a persisted default can never be changed again for anyone who has
+     * already run the client once.
+     */
+    public static final int STYLE_VERSION = 2;
+
     private static Appearance appearance = Appearance.DARK;
     private static AccentMode accentMode = AccentMode.GRADIENT;
     private static int accentPrimary = 0xFF5B8CFF;
@@ -161,25 +171,25 @@ public final class Theme {
 
     public static int background() {
         return switch (appearance) {
-            case DARK -> 0xD8121620;
-            case MIDNIGHT -> 0xDE080B14;
-            case LIGHT -> 0xD8F4F6FA;
+            case DARK -> 0xA60E1219;
+            case MIDNIGHT -> 0xAE05080F;
+            case LIGHT -> 0xA6F2F5FA;
         };
     }
 
     public static int surface() {
         return switch (appearance) {
-            case DARK -> 0xC81A2030;
-            case MIDNIGHT -> 0xCE0E1526;
-            case LIGHT -> 0xD8FFFFFF;
+            case DARK -> 0x66151B27;
+            case MIDNIGHT -> 0x6E0A1020;
+            case LIGHT -> 0x70FFFFFF;
         };
     }
 
     public static int surfaceHigh() {
         return switch (appearance) {
-            case DARK -> 0xE0232B3E;
-            case MIDNIGHT -> 0xE4182238;
-            case LIGHT -> 0xF0EDEFF5;
+            case DARK -> 0x8C222A3C;
+            case MIDNIGHT -> 0x94162036;
+            case LIGHT -> 0x9CE9ECF3;
         };
     }
 

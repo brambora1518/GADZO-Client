@@ -307,24 +307,20 @@ public final class Render2D {
     // -- helpers ----------------------------------------------------------------------
 
     /**
-     * Marks everything drawn before this point to be blurred.
+     * Blurs everything drawn before this point.
      *
-     * <p>This is the frosted-glass effect behind the menus: the world (and any panel already
-     * submitted) is blurred, then the current stratum draws on top of it crisply.
+     * <p>This is the frosted-glass effect behind the menus: the world is blurred, then the
+     * panel draws on top of it crisply. Called at the very top of a screen's {@code render},
+     * where the framebuffer holds the world and nothing else yet.
      *
-     * <p>The GUI render state permits only one blur per frame and throws on a second request.
-     * Screens are expected to call this from {@code extractBackground}, replacing vanilla's
-     * own blur rather than adding to it — but a backdrop effect must never be able to take
-     * the game down, so a duplicate request is swallowed and the frame simply renders
-     * unblurred.
+     * <p>1.20.1 has no GUI blur of its own, so {@link BackgroundBlur} drives vanilla's unused
+     * post-processing blur shader directly. Returns {@code false} when that is unavailable,
+     * which is the caller's cue to fall back to a plain dim.
      *
-     * @return whether the blur was accepted
+     * @return whether the blur actually ran
      */
     public static boolean blurBehind(DrawContext gfx) {
-        // Minecraft 1.20.1 has no GUI backdrop blur — the frosted-glass effect arrived with
-        // the render-state rework in later versions. Screens fall back to a dim overlay,
-        // which is why Theme.blurEnabled() has no visible effect on this branch.
-        return false;
+        return BackgroundBlur.apply(gfx);
     }
 
     /** Starts a new depth stratum so later draws sit cleanly above earlier ones. */

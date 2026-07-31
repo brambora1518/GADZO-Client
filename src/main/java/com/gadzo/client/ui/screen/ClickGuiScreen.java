@@ -144,17 +144,16 @@ public class ClickGuiScreen extends Screen {
     /**
      * Frosted backdrop.
      *
-     * <p>Done here rather than in {@link #extractRenderState} because vanilla's default
-     * background also requests a blur, and the GUI render state allows only one per frame —
-     * overriding replaces that request instead of adding a second one that would throw.
+     * <p>The dim is chosen by whether the blur actually ran. Blur already separates the panel
+     * from the world, so stacking the full dim on top of it would hide the very effect it is
+     * there to reveal; without blur, the dim is the only thing doing that job and has to carry
+     * it alone.
      */
     private void drawBackdrop(DrawContext gfx) {
         double open = openAnimation.value();
-        if (Theme.blurEnabled()) {
-            Render2D.blurBehind(gfx);
-        }
-        // Dim the world so the window reads as a focused surface.
-        Render2D.rect(gfx, 0, 0, width, height, ColorUtil.fade(0xB0000000, open));
+        boolean blurred = Theme.blurEnabled() && Render2D.blurBehind(gfx);
+        Render2D.rect(gfx, 0, 0, width, height,
+                ColorUtil.fade(blurred ? 0x38000000 : 0xB0000000, open));
     }
 
     @Override

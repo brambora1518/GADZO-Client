@@ -134,6 +134,7 @@ public final class ConfigManager {
 
     private static JsonObject writeTheme() {
         JsonObject theme = new JsonObject();
+        theme.addProperty("styleVersion", Theme.STYLE_VERSION);
         theme.addProperty("appearance", Theme.appearance().name());
         theme.addProperty("accentMode", Theme.accentMode().name());
         theme.addProperty("accentPrimary", ColorUtil.toHex(Theme.accentStart()));
@@ -214,7 +215,23 @@ public final class ConfigManager {
         load(activeProfile);
     }
 
+    /**
+     * Restores the saved theme.
+     *
+     * <p>Values the player actively chooses — appearance, accent colours, whether blur is on —
+     * are always restored. Values that are purely the client's own styling are only restored
+     * when the config was written by the current {@link Theme#STYLE_VERSION}.
+     *
+     * <p>That distinction exists because of a real bug: corner radius is persisted, so the
+     * first run wrote the then-default 8 into every profile, and every later change to that
+     * default was silently overwritten on load. A restyle could not reach anyone who had
+     * already launched the client once. Bumping the style version now lets the new defaults
+     * through exactly once, without touching the colours someone picked on purpose.
+     */
     private static void readTheme(JsonObject theme) {
+        int styleVersion = theme.has("styleVersion") ? theme.get("styleVersion").getAsInt() : 0;
+        boolean currentStyle = styleVersion >= Theme.STYLE_VERSION;
+
         if (theme.has("appearance")) {
             parseEnum(Theme.Appearance.class, theme.get("appearance").getAsString())
                     .ifPresent(Theme::setAppearance);
@@ -229,7 +246,7 @@ public final class ConfigManager {
         if (theme.has("accentSecondary")) {
             Theme.setAccentSecondary(ColorUtil.parseHex(theme.get("accentSecondary").getAsString(), 0xFF9B5BFF));
         }
-        if (theme.has("radius")) {
+        if (theme.has("radius") && currentStyle) {
             Theme.setCornerRadius(theme.get("radius").getAsDouble());
         }
         if (theme.has("blur")) {

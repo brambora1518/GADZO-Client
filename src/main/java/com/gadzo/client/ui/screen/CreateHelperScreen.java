@@ -173,11 +173,11 @@ public class CreateHelperScreen extends Screen {
 
     // -- rendering ------------------------------------------------------------------------
 
+    /** Blur separates the panel from the world; without it the dim has to do that job alone. */
     private void drawBackdrop(DrawContext gfx, double open) {
-        if (Theme.blurEnabled()) {
-            Render2D.blurBehind(gfx);
-        }
-        Render2D.rect(gfx, 0, 0, width, height, ColorUtil.fade(0xB0000000, open));
+        boolean blurred = Theme.blurEnabled() && Render2D.blurBehind(gfx);
+        Render2D.rect(gfx, 0, 0, width, height,
+                ColorUtil.fade(blurred ? 0x38000000 : 0xB0000000, open));
     }
 
     @Override

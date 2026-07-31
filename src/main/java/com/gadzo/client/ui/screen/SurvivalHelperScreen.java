@@ -143,10 +143,10 @@ public class SurvivalHelperScreen extends Screen {
     public void render(DrawContext gfx, int mouseX, int mouseY, float partialTick) {
         double open = openAnimation.value();
 
-        if (Theme.blurEnabled()) {
-            Render2D.blurBehind(gfx);
-        }
-        Render2D.rect(gfx, 0, 0, width, height, ColorUtil.fade(0xB0000000, open));
+        // Blur separates the panel from the world; without it the dim has to do that alone.
+        boolean blurred = Theme.blurEnabled() && Render2D.blurBehind(gfx);
+        Render2D.rect(gfx, 0, 0, width, height,
+                ColorUtil.fade(blurred ? 0x38000000 : 0xB0000000, open));
 
         windowX = (width - WINDOW_WIDTH) / 2.0;
         windowY = (height - WINDOW_HEIGHT) / 2.0;

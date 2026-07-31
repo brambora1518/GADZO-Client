@@ -79,11 +79,16 @@ public class HudEditorScreen extends Screen {
      * <p>See {@code ClickGuiScreen.extractBackground}: vanilla's default background requests
      * a blur too, and only one is permitted per frame.
      */
+    /**
+     * Dimmed, and blurred when that is available.
+     *
+     * <p>Lighter than the menu backdrops either way: this screen's whole purpose is judging
+     * how the HUD elements look, so the world behind them has to stay legible.
+     */
     private void drawBackdrop(DrawContext gfx, double open) {
-        if (Theme.blurEnabled()) {
-            Render2D.blurBehind(gfx);
-        }
-        Render2D.rect(gfx, 0, 0, width, height, ColorUtil.fade(0x99000000, open));
+        boolean blurred = Theme.blurEnabled() && Render2D.blurBehind(gfx);
+        Render2D.rect(gfx, 0, 0, width, height,
+                ColorUtil.fade(blurred ? 0x2E000000 : 0x99000000, open));
     }
 
     @Override
