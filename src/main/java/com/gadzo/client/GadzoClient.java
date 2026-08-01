@@ -12,6 +12,7 @@ import com.gadzo.client.modules.client.HudEditorLauncher;
 import com.gadzo.client.modules.client.MenuLauncher;
 import com.gadzo.client.modules.client.SurvivalHelperLauncher;
 import com.gadzo.client.modules.create.KineticHud;
+import com.gadzo.client.modules.create.NetworkOverlay;
 import com.gadzo.client.modules.create.StressAlert;
 import com.gadzo.client.modules.hud.ArmorHud;
 import com.gadzo.client.modules.hud.ClockHud;
@@ -27,15 +28,18 @@ import com.gadzo.client.modules.hud.PingHud;
 import com.gadzo.client.modules.hud.PlayerStatsHud;
 import com.gadzo.client.modules.hud.PotionHud;
 import com.gadzo.client.modules.hud.SessionHud;
+import com.gadzo.client.modules.hud.SmoothnessHud;
 import com.gadzo.client.modules.hud.SpeedHud;
 import com.gadzo.client.modules.hud.TargetHud;
 import com.gadzo.client.modules.hud.ToggleSprintHud;
 import com.gadzo.client.modules.hud.WorldInfoHud;
+import com.gadzo.client.modules.performance.BlockEntityLimiter;
 import com.gadzo.client.modules.performance.DynamicFps;
 import com.gadzo.client.modules.performance.EntityCulling;
 import com.gadzo.client.modules.performance.ParticleLimiter;
 import com.gadzo.client.modules.performance.RenderTuning;
 import com.gadzo.client.modules.performance.ScreenEffects;
+import com.gadzo.client.modules.performance.StutterGuard;
 import com.gadzo.client.modules.performance.WeatherRender;
 import com.gadzo.client.modules.survival.CompassHud;
 import com.gadzo.client.modules.survival.CropWatchHud;
@@ -46,6 +50,7 @@ import com.gadzo.client.modules.survival.ExperienceHud;
 import com.gadzo.client.modules.survival.FoodHud;
 import com.gadzo.client.modules.survival.LightLevelHud;
 import com.gadzo.client.modules.survival.TotemHud;
+import com.gadzo.client.modules.survival.SpawnOverlay;
 import com.gadzo.client.modules.survival.SurvivalAlerts;
 import com.gadzo.client.modules.survival.Waypoints;
 import com.gadzo.client.modules.visual.Fullbright;
@@ -79,6 +84,8 @@ public class GadzoClient implements ClientModInitializer {
 
     private static RenderTuning renderTuning;
     private static Waypoints waypoints;
+    private static SpawnOverlay spawnOverlay;
+    private static NetworkOverlay networkOverlay;
 
     public static ModuleManager modules() {
         return MODULES;
@@ -104,6 +111,8 @@ public class GadzoClient implements ClientModInitializer {
         GadzoCommands.register();
         TitleScreenBranding.register();
         Waypoints.register(waypoints);
+        SpawnOverlay.register(spawnOverlay);
+        NetworkOverlay.register(networkOverlay);
 
         ClientTickEvents.END_CLIENT_TICK.register(client -> MODULES.tick());
 
@@ -134,6 +143,8 @@ public class GadzoClient implements ClientModInitializer {
     private void registerModules() {
         renderTuning = new RenderTuning();
         waypoints = new Waypoints();
+        spawnOverlay = new SpawnOverlay();
+        networkOverlay = new NetworkOverlay();
 
         MODULES.registerAll(
                 // Performance
@@ -143,6 +154,8 @@ public class GadzoClient implements ClientModInitializer {
                 new ParticleLimiter(),
                 new ScreenEffects(),
                 new WeatherRender(),
+                new BlockEntityLimiter(),
+                new StutterGuard(),
                 new FrametimeGraphHud(),
 
                 // HUD
@@ -157,6 +170,7 @@ public class GadzoClient implements ClientModInitializer {
                 new PotionHud(),
                 new ToggleSprintHud(),
                 new HardwareHud(),
+                new SmoothnessHud(),
                 new SpeedHud(),
                 new WorldInfoHud(),
                 new PlayerStatsHud(),
@@ -180,11 +194,13 @@ public class GadzoClient implements ClientModInitializer {
                 new TotemHud(),
                 new ElytraHud(),
                 new CropWatchHud(),
+                spawnOverlay,
                 new SurvivalAlerts(),
                 new SurvivalHelperLauncher(),
 
                 // Create
                 new KineticHud(),
+                networkOverlay,
                 new StressAlert(),
                 new CreateHelperLauncher(),
 

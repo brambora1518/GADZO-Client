@@ -3,10 +3,12 @@
 	"package": "com.gadzo.client.mixin",
 	"compatibilityLevel": "JAVA_17",
 	"client": [
+		"BlockEntityRenderDispatcherMixin",
 		"EntityRenderDispatcherMixin",
 		"GameRendererMixin",
 		"InteractionManagerMixin",
 		"KeyboardMixin",
+		"MinecraftClientMixin",
 		"MouseMixin",
 		"ParticleManagerMixin",
 		"WorldRendererMixin"

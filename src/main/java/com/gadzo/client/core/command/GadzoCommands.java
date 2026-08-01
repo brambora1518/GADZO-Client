@@ -5,6 +5,8 @@ import com.gadzo.client.core.config.ConfigManager;
 import com.gadzo.client.core.module.Module;
 import com.gadzo.client.core.module.ModuleCategory;
 import com.gadzo.client.core.system.CpuBenchmark;
+import com.gadzo.client.core.system.FrameTimeMonitor;
+import com.gadzo.client.core.system.PerformanceDiagnosis;
 import com.gadzo.client.core.system.SystemProfile;
 import com.gadzo.client.survival.NetherCalculator;
 import com.gadzo.client.survival.Waypoint;
@@ -72,6 +74,9 @@ public final class GadzoCommands {
                         .then(ClientCommandManager.literal("hardware")
                                 .executes(ctx -> showHardware(ctx.getSource())))
 
+                        .then(ClientCommandManager.literal("perf")
+                                .executes(ctx -> showPerformance(ctx.getSource())))
+
                         .then(ClientCommandManager.literal("wp")
                                 .executes(ctx -> listWaypoints(ctx.getSource()))
                                 .then(ClientCommandManager.literal("add")
@@ -102,6 +107,54 @@ public final class GadzoCommands {
                                             + ConfigManager.activeProfile() + "'.");
                                     return 1;
                                 }))));
+    }
+
+    /**
+     * Prints what the frame-time monitor has measured, then what it means.
+     *
+     * <p>Numbers first and conclusions second, deliberately: the findings are heuristics over
+     * the measurements, and printing the measurements lets someone disagree with the reasoning
+     * rather than having to take it on faith.
+     */
+    private static int showPerformance(FabricClientCommandSource source) {
+        if (!FrameTimeMonitor.hasData()) {
+            feedback(source, "Still measuring — play for a few seconds and run this again.");
+            return 1;
+        }
+
+        feedback(source, "Average " + Math.round(FrameTimeMonitor.averageFps()) + " FPS"
+                + "   1% low " + Math.round(FrameTimeMonitor.lowOnePercent())
+                + "   0.1% low " + Math.round(FrameTimeMonitor.lowTenthPercent()));
+
+        int spikes = FrameTimeMonitor.spikesInWindow();
+        int gcSpikes = FrameTimeMonitor.gcSpikesInWindow();
+        feedback(source, "Stutters in the last minute: " + spikes
+                + (spikes > 0 ? " (" + gcSpikes + " during a collection)" : ""));
+
+        FrameTimeMonitor.Spike worst = FrameTimeMonitor.worstInWindow();
+        if (worst != null) {
+            feedback(source, "Worst frame: " + Math.round(worst.durationMs()) + " ms — "
+                    + worst.cause());
+        }
+
+        feedback(source, "Collector: " + FrameTimeMonitor.collectorNames() + ", "
+                + FrameTimeMonitor.gcMillisInWindow() + " ms per minute");
+        feedback(source, "Heap: " + SystemProfile.maxHeapMb() + " MB"
+                + (SystemProfile.physicalRamMb() > 0
+                        ? " of " + SystemProfile.physicalRamMb() + " MB" : "")
+                + ", suggested " + PerformanceDiagnosis.recommendedHeapMb() + " MB");
+
+        for (PerformanceDiagnosis.Finding finding : PerformanceDiagnosis.run()) {
+            Formatting colour = switch (finding.severity()) {
+                case BAD -> Formatting.RED;
+                case WARN -> Formatting.YELLOW;
+                case INFO -> Formatting.GRAY;
+                case GOOD -> Formatting.GREEN;
+            };
+            source.sendFeedback(Text.literal("[GADZO] " + finding.title() + " — "
+                    + finding.detail()).formatted(colour));
+        }
+        return 1;
     }
 
     // -- helpers -------------------------------------------------------------------------

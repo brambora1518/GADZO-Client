@@ -20,6 +20,8 @@ unfair advantage: every module is a readout, a render setting, or a UI convenien
 | **Entity culling** | Stops drawing entities past a configurable distance, with separate limits for dropped items, item frames and armour stands. Players are never culled. |
 | **Particle limiter** | Budgets particle spawns per tick, so one explosion can't spike the frame time. |
 | **Screen effects** | Scales down nausea, portal warp, darkness pulse and glint animation — a performance win and a motion-comfort control. |
+| **Block entity limit** | Caps how far away chests, signs and Create machines are drawn, with a shorter limit for kinetic blocks. On a Create pack this is the single largest frame-time saving here: every shaft, cog, belt and funnel is a block entity with an animated renderer, a mid-sized factory holds hundreds of them, and vanilla applies no distance limit at all. |
+| **Stutter guard** | Watches frame pacing and names the cause the first time it matters — see below. |
 | **Weather render** | Skips drawing rain, snow and optionally the sun/moon/stars. Precipitation is a large pile of camera-facing quads every frame and is one of the few effects that reliably halves the frame rate on older hardware during a storm. The weather itself is unaffected — sky still darkens, mobs still spawn. |
 
 Render tuning ships an **Auto-detect** preset that measures the machine rather than looking up
@@ -59,6 +61,28 @@ GPU load is off by default. The game only measures it while its own `GPU_UTILIZA
 entry is active, so reading the figure means switching that entry on; the module does so only
 when you ask, and restores your previous setting when you turn it back off.
 
+### Measuring stutter, not frame rate
+
+Average frame rate is close to useless for diagnosing the thing people actually complain about.
+A client that renders 200 frames in 900 ms and then one frame in 100 ms reports 201 FPS and
+feels terrible. What you notice is the long frames.
+
+So the client records every frame time and reports the **lows** — the mean frame rate across
+the worst 1% and 0.1% of frames — on the **Smoothness** HUD element and via `/gadzo perf`.
+
+The more useful half is attribution. Each frame the accumulated pause time reported by every
+garbage collector is sampled, and a long frame that coincides with a collection is recorded as
+a **GC pause** rather than as an anonymous spike. That turns "it stutters" into "it stutters
+because the heap is too big", which is a problem someone can go and fix.
+
+`/gadzo perf` prints the measurements first and the conclusions second, on purpose: the
+findings are heuristics over the numbers, and showing the numbers lets you disagree with the
+reasoning instead of taking it on faith.
+
+The monitor is careful not to become the problem it measures. Per frame it does two counter
+reads and a ring-buffer write; the statistics need a sort, so they are recomputed at most twice
+a second.
+
 ### Heap advisory
 
 On startup the client checks the heap allocation and warns if it looks wrong — too large
@@ -74,13 +98,17 @@ heap also squeezes the OS page cache, which is what makes chunk loading feel slu
 
 FPS · CPS · Ping · Coordinates · Memory · Clock · Keystrokes · Armour · Potions · Movement
 state · Speed · World info (biome / day / server) · Player stats · Hardware · Session ·
-Frametime graph · Combo counter · Target
+Frametime graph · Smoothness · Combo counter · Target
 
 Two worth calling out:
 
 **Frametime graph.** An average FPS number hides the thing that actually ruins gameplay — the
 occasional 80 ms frame. Plotting frame *time* makes a stutter a tall bar rather than a dip in
 an already-averaged number, and the 1% low figure says the same thing numerically.
+
+**Smoothness.** 1% and 0.1% lows, stutters in the last minute, how many of them were
+collections, and how much of that minute the collector held the game still. Colour-coded by
+cause rather than by count — the count tells you nothing you cannot already feel.
 
 **Target.** Health, absorption and distance for whoever you are fighting. The target is held
 for a configurable grace period after it leaves the crosshair, because in a fight the camera
@@ -100,6 +128,7 @@ rarely stays on the opponent and a panel that vanished instantly would just flic
 | **Totems** | How many Totems of Undying you are carrying — a warning colour at zero rather than a number you have to read to interpret. |
 | **Elytra** | Altitude, vertical and horizontal speed, and firework rockets left, visible only while actually gliding. |
 | **Crop watch** | Growth stage of whatever you are looking at, read generically off any block's `age` property — works on modded crops the same as vanilla ones. |
+| **Spawn overlay** | Draws a marker on every block around you where a hostile mob can spawn. Red means always dark; amber means the sky reaches it, so it is safe by day and dangerous after dusk. Lighting a base is otherwise guesswork — the light a torch actually reaches is not something you can see. |
 | **Survival alerts** | Low health, drowning, hunger and gear warnings — fired on a threshold being *crossed*, not while it is true. |
 
 Waypoints are stored per world, in their own file, deliberately outside the profile system:
@@ -147,6 +176,13 @@ unchanged, so the only reachable ratios are powers of two. Ask for 45 RPM from 6
 solver says plainly that no cogwheel chain can do it and you need a Rotational Speed Controller
 — rather than offering a near miss.
 
+**Network overlay** — look at any kinetic block and the entire network it belongs to lights up.
+Create gives no way to see the shape of a network, so a shaft that is not turning is either
+disconnected or overstressed, and telling those apart means following the drive by eye through
+walls, floors and encasing. Where the highlight ends is where the connection ends, which is the
+answer to nearly every "why is this not spinning" question in the mod. The outline turns red
+while the network is overstressed.
+
 **Networks nearby** — the kinetic readout shows one block at a time; this shows the whole
 factory. It walks the loaded chunks around you, groups every kinetic block it finds by the
 network it actually belongs to, and lists each network's size, stress and load. Scanning every
@@ -174,6 +210,7 @@ network.
 /gadzo profile                show profiles
 /gadzo profile save|load <n>  manage profiles
 /gadzo hardware               tier, benchmark score, heap advice
+/gadzo perf                   frame-time lows, stutter count, GC attribution, diagnosis
 /gadzo wp                     list waypoints in this world
 /gadzo wp add|del|toggle <n>  manage waypoints
 /gadzo wp clear               remove every waypoint here
@@ -212,10 +249,25 @@ Positions are stored as *anchor + offset*, never as absolute pixels.
 
 Press **Right Shift** in game.
 
-Category sidebar, fuzzy search across names and descriptions, live toggles, and a settings
-panel with animated switches, sliders, dropdowns, colour swatches and keybind capture. The
-world stays visible behind a frosted-glass blur, so you can tune a HUD element and watch it
-change.
+It is a **command palette**, not a three-column window. One narrow column: a search field that
+is always focused, a flat list of every module, and — for whichever row is expanded — that
+module's settings inline underneath it. Type to filter, arrows to move, enter to toggle, tab
+for settings, escape to back out one layer at a time.
+
+That shape replaced the usual category sidebar on purpose. With thirty-odd modules, picking a
+category and then hunting a list is strictly more work than typing three letters, and the
+sidebar spent its whole life occupying a fifth of the window to save one keystroke. Removing it
+also removed two internal panel edges, which is most of what made the old layout read as a
+stack of boxes rather than a single surface.
+
+State is a **dot, not a switch**. Thirty switches in a column is a wall of controls; a dot reads
+as status, and the row itself is the control.
+
+The helper screens (**G** and **H**) share the same chrome through a common `GlassScreen` base:
+header, a row of text tabs with an accent underline instead of a sidebar, a scrolling body, and
+a hint line. Sections inside are separated by space and type weight, never by a border — one
+sheet of glass with exactly one edge on it. The world stays visible behind a frosted blur, so
+you can tune a HUD element and watch it change.
 
 Themes: Dark, Midnight and Light, with a static / gradient / rainbow accent, adjustable corner
 radius and an optional blur toggle. Colour settings open a real HSV picker — a
@@ -235,7 +287,7 @@ cosmetic gain, and would be a new way to break the path into a world every versi
 
 ## Building
 
-Requires **JDK 25** (Minecraft 26.2's toolchain).
+Requires **JDK 17** on this branch (Minecraft 1.20.1's toolchain). `main` needs JDK 25.
 
 ```bash
 ./gradlew build
@@ -251,7 +303,8 @@ To run it in a dev environment:
 
 ### Installing
 
-1. Install [Fabric Loader](https://fabricmc.net/use/) 0.19.3+ for Minecraft 26.2.
+1. Install [Fabric Loader](https://fabricmc.net/use/) 0.19.3+ for Minecraft 1.20.1 on this
+   branch (26.2 on `main`).
 2. Drop [Fabric API](https://modrinth.com/mod/fabric-api) into `mods/`.
 3. Drop `gadzo-client-<version>.jar` into `mods/`.
 
@@ -325,6 +378,22 @@ the colour picker's position marker — is a few pixels larger now and drawn as 
 or a ring instead of a filled dot, which is where most of the "pixelated" look actually came
 from.
 
+**A persisted default can never be changed again — unless you plan for it.** The corner radius
+is a saved setting, so the value written on a player's first launch outlived every later change
+to the default, and a restyle simply could not reach anyone who had already run the client once.
+Fixing it took three parts, because the value was defended in three places: `Theme` now owns the
+one `DEFAULT_RADIUS` constant, the settings module reads that constant instead of holding a
+second copy of the number (its own copy of `8` was quietly overwriting the theme at startup),
+and settings marked `styleOwned()` are skipped when loading a profile written under an older
+`Theme.STYLE_VERSION`. Colours the player picked on purpose are untouched; the client's own
+styling defaults land exactly once.
+
+**Compiling proves a change is valid, not that it is visible.** Several rounds of UI work shipped
+without anything on screen moving, for the reason above. `tools/uipreview` exists because of it:
+it compiles the client's *real* `Render2D`, `Theme` and `ColorUtil` against stub Minecraft classes
+and writes a PNG, so a layout can be looked at before it is shipped rather than after it is
+reported as unchanged.
+
 **A HUD element's measurement methods can be called several times a frame.** `HudModule.render`
 calls `contentWidth`/`contentHeight` twice each (once directly, once through `resolveX`/
 `resolveY`) before `renderContent` runs a fifth time. Elements whose content is cheap to compute
@@ -352,9 +421,10 @@ compatibility layer. `main` stays on 26.2.
 
 Differences forced by the older API, rather than by choice:
 
-- **No backdrop blur.** The frosted-glass effect behind menus arrived with the render-state
-  rework in later versions. Screens fall back to a dim overlay, so `Theme.blurEnabled()` has
-  no visible effect on this branch.
+- **Backdrop blur works, but by a different route.** 1.20.1 has no GUI blur API. It does ship
+  an unused vanilla post-effect, `shaders/post/blur.json` — a two-pass separable Gaussian — and
+  the client drives it through `PostEffectProcessor` before drawing a panel. Pending GUI draws
+  are flushed first, or the blur composites over them instead of under them.
 - **No bottleneck verdict.** 1.20.1 has no GPU timing API, so the client cannot say whether a
   frame is CPU- or GPU-bound. That readout is absent rather than faked.
 - **The Hardware element names your CPU instead.** 1.20.1 exposes `GlDebugInfo.getCpuInfo()`,

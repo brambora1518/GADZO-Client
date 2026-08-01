@@ -55,6 +55,16 @@ public final class ConfigManager {
      */
     private static volatile boolean loading;
 
+    /**
+     * Whether the profile currently being read was written under the present
+     * {@link Theme#STYLE_VERSION}.
+     *
+     * <p>Set by {@link #readTheme(JsonObject)} and consulted by {@link #readModules(JsonObject)},
+     * which is why the theme block is always read first. A stale profile keeps everything the
+     * player chose but lets the client's own styling defaults through.
+     */
+    private static boolean profileStyleCurrent = true;
+
     private ConfigManager() {
     }
 
@@ -195,6 +205,8 @@ public final class ConfigManager {
                 return;
             }
             JsonObject root = parsed.getAsJsonObject();
+            // A profile with no theme block predates style versioning entirely.
+            profileStyleCurrent = false;
             if (root.has("theme")) {
                 readTheme(root.getAsJsonObject("theme"));
             }
@@ -227,10 +239,16 @@ public final class ConfigManager {
      * default was silently overwritten on load. A restyle could not reach anyone who had
      * already launched the client once. Bumping the style version now lets the new defaults
      * through exactly once, without touching the colours someone picked on purpose.
+     *
+     * <p>Guarding this block alone was not enough, and that is worth recording. The radius is
+     * also a module setting, restored by {@link #readModules(JsonObject)} with a listener that
+     * writes straight back into the theme — so the guard here was undone moments later by the
+     * settings pass. {@link #profileStyleCurrent} is published from here for that reason.
      */
     private static void readTheme(JsonObject theme) {
         int styleVersion = theme.has("styleVersion") ? theme.get("styleVersion").getAsInt() : 0;
         boolean currentStyle = styleVersion >= Theme.STYLE_VERSION;
+        profileStyleCurrent = currentStyle;
 
         if (theme.has("appearance")) {
             parseEnum(Theme.Appearance.class, theme.get("appearance").getAsString())
@@ -273,9 +291,15 @@ public final class ConfigManager {
             if (entry.has("settings")) {
                 JsonObject settings = entry.getAsJsonObject("settings");
                 for (Setting<?> setting : module.getSettings()) {
-                    if (settings.has(setting.getId())) {
-                        setting.read(settings.get(setting.getId()));
+                    if (!settings.has(setting.getId())) {
+                        continue;
                     }
+                    // A style-owned value from an older profile is the client's old default,
+                    // not a choice — leaving it out lets the current default stand.
+                    if (setting.isStyleOwned() && !profileStyleCurrent) {
+                        continue;
+                    }
+                    setting.read(settings.get(setting.getId()));
                 }
             }
 

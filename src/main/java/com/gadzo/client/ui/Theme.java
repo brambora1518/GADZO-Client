@@ -56,14 +56,24 @@ public final class Theme {
      * itself. Without it, a persisted default can never be changed again for anyone who has
      * already run the client once.
      */
-    public static final int STYLE_VERSION = 2;
+    public static final int STYLE_VERSION = 3;
+
+    /**
+     * The corner radius the client styles itself with.
+     *
+     * <p>Lives here rather than in the settings module because two copies of one default is
+     * how the previous restyle failed. {@code Theme} was changed to 12 while the module that
+     * pushes the value into it still defaulted to 8, and that module runs at startup — so the
+     * new default was overwritten before anything was ever drawn with it.
+     */
+    public static final double DEFAULT_RADIUS = 12.0;
 
     private static Appearance appearance = Appearance.DARK;
     private static AccentMode accentMode = AccentMode.GRADIENT;
     private static int accentPrimary = 0xFF5B8CFF;
     private static int accentSecondary = 0xFF9B5BFF;
     private static int rainbowPeriodMillis = 6000;
-    private static double cornerRadius = 12.0;
+    private static double cornerRadius = DEFAULT_RADIUS;
     private static boolean blurEnabled = true;
 
     private Theme() {

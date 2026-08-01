@@ -25,6 +25,7 @@ public abstract class Setting<T> {
     private String description = "";
     private T value;
     private BooleanSupplier visibility = () -> true;
+    private boolean styleOwned;
     private final List<Consumer<T>> listeners = new ArrayList<>(0);
 
     protected Setting(String name, T defaultValue) {
@@ -93,6 +94,28 @@ public abstract class Setting<T> {
     public <S extends Setting<T>> S describe(String description) {
         this.description = description;
         return (S) this;
+    }
+
+    /**
+     * Marks this setting as one whose default the client owns rather than the player.
+     *
+     * <p>Corner radius is the motivating case, and it is worth spelling out because it cost
+     * four rounds of "the UI looks the same". The radius is persisted like any other setting,
+     * so the value written on a player's first launch outlived every later change to the
+     * default: a restyle could not reach anyone who had already run the client once.
+     *
+     * <p>A style-owned setting is skipped when loading a profile written under an older
+     * {@link com.gadzo.client.ui.Theme#STYLE_VERSION}. The new default lands exactly once,
+     * and colours the player picked on purpose are untouched.
+     */
+    @SuppressWarnings("unchecked")
+    public <S extends Setting<T>> S styleOwned() {
+        this.styleOwned = true;
+        return (S) this;
+    }
+
+    public boolean isStyleOwned() {
+        return styleOwned;
     }
 
     @SuppressWarnings("unchecked")

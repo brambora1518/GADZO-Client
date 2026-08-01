@@ -100,6 +100,47 @@ public final class NetworkScanner {
         return result;
     }
 
+    /**
+     * Every loaded position belonging to one network.
+     *
+     * <p>Separate from {@link #scanNearby()} rather than folded into it: the summary is wanted
+     * for all networks at once, this is wanted for exactly one, and keeping a position list per
+     * network during a full scan would allocate a list for every network in range to serve a
+     * caller interested in a single one.
+     */
+    public static List<BlockPos> membersOf(long networkId) {
+        if (!CreateBridge.isLive()) {
+            return List.of();
+        }
+        PlayerEntity player = Mc.player();
+        ClientWorld world = Mc.client() == null ? null : Mc.client().world;
+        if (player == null || world == null) {
+            return List.of();
+        }
+
+        List<BlockPos> members = new ArrayList<>();
+        ChunkPos center = new ChunkPos(player.getBlockPos());
+        for (int dx = -SCAN_RADIUS_CHUNKS; dx <= SCAN_RADIUS_CHUNKS; dx++) {
+            for (int dz = -SCAN_RADIUS_CHUNKS; dz <= SCAN_RADIUS_CHUNKS; dz++) {
+                if (!(world.getChunk(center.x + dx, center.z + dz, ChunkStatus.FULL, false)
+                        instanceof WorldChunk chunk)) {
+                    continue;
+                }
+                for (Map.Entry<BlockPos, BlockEntity> entry : chunk.getBlockEntities().entrySet()) {
+                    BlockEntity blockEntity = entry.getValue();
+                    if (!CreateBridge.isKinetic(blockEntity)) {
+                        continue;
+                    }
+                    Long id = CreateBridge.networkId(blockEntity);
+                    if (id != null && id == networkId) {
+                        members.add(entry.getKey());
+                    }
+                }
+            }
+        }
+        return members;
+    }
+
     /** Builds one {@link NetworkInfo} while walking the scan, tracking the closest member seen. */
     private static final class Accumulator {
         private final long id;

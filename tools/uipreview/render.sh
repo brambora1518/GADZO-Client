@@ -11,9 +11,10 @@ cp "$SRC/ui/Render2D.java" "$SRC/ui/Theme.java" "$BUILD/com/gadzo/client/ui/"
 cp "$SRC/util/ColorUtil.java" "$SRC/util/MathUtil.java" "$BUILD/com/gadzo/client/util/"
 cp stub/com/gadzo/client/ui/BackgroundBlur.java "$BUILD/com/gadzo/client/ui/"
 cp -r net "$BUILD/"
-cp Preview.java "$BUILD/"
+cp Preview.java HelperPreview.java "$BUILD/"
 
 javac -nowarn -d "$BUILD/out" $(find "$BUILD" -name '*.java')
 java -cp "$BUILD/out" Preview blur "$(pwd)/blur.png"
 java -cp "$BUILD/out" Preview noblur "$(pwd)/noblur.png"
-echo "wrote blur.png and noblur.png"
+java -cp "$BUILD/out" HelperPreview blur "$(pwd)/helper.png"
+echo "wrote blur.png, noblur.png and helper.png"

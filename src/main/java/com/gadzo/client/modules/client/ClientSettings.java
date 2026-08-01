@@ -51,8 +51,11 @@ public class ClientSettings extends Module {
                 .visibleWhen(() -> !this.accentMode.is(Theme.AccentMode.STATIC)));
         this.accentSpeed.onChange(value -> Theme.setRainbowPeriod((int) Math.round(value)));
 
-        this.cornerRadius = addNumber("Corner radius", 8, 0, 16, 1,
+        // Default read from Theme, never written out again here: this setting is applied to
+        // the theme at startup, so a second copy of the number would silently win.
+        this.cornerRadius = addNumber("Corner radius", Theme.DEFAULT_RADIUS, 0, 20, 1,
                 "How rounded every panel and control is");
+        this.cornerRadius.styleOwned();
         this.cornerRadius.onChange(Theme::setCornerRadius);
 
         this.blur = addBool("Background blur", true,
